@@ -4,14 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"quibit/internal/ai"
 	"quibit/internal/db"
 
 	"github.com/spf13/cobra"
 )
 
 var migrate bool
-var generate bool
 
 var rootCmd = &cobra.Command{
 	Use:           "quibit",
@@ -46,52 +44,6 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 
-		if generate {
-			{
-				ctx := cmd.Context()
-				fmt.Fprintln(cmd.OutOrStdout(), "Connecting to Gemini...")
-				client, err := ai.NewGeminiClient(ctx)
-				if err != nil {
-					return fmt.Errorf("generate: %w", err)
-				}
-				fmt.Fprintln(cmd.OutOrStdout(), "Gemini connected.")
-
-				g, err := ai.NewGenerator(client)
-				if err != nil {
-					return fmt.Errorf("generate: %w", err)
-				}
-				idea, err := g.GenerateProjectIdea(ctx)
-				if err != nil {
-					return fmt.Errorf("generate: %w", err)
-				}
-
-				fmt.Fprintln(cmd.OutOrStdout(), "Title:")
-				fmt.Fprintln(cmd.OutOrStdout(), idea.Title)
-				fmt.Fprintln(cmd.OutOrStdout(), "")
-				fmt.Fprintln(cmd.OutOrStdout(), "Description:")
-				fmt.Fprintln(cmd.OutOrStdout(), idea.Description)
-				fmt.Fprintln(cmd.OutOrStdout(), "")
-				fmt.Fprintln(cmd.OutOrStdout(), "Complexity:")
-				fmt.Fprintln(cmd.OutOrStdout(), idea.Complexity)
-				fmt.Fprintln(cmd.OutOrStdout(), "")
-				fmt.Fprintln(cmd.OutOrStdout(), "Tech Stack:")
-				for _, item := range idea.TechStack {
-					fmt.Fprintf(cmd.OutOrStdout(), "- %s\n", item)
-				}
-				fmt.Fprintln(cmd.OutOrStdout(), "")
-				fmt.Fprintln(cmd.OutOrStdout(), "Core Features:")
-				for _, item := range idea.CoreFeatures {
-					fmt.Fprintf(cmd.OutOrStdout(), "- %s\n", item)
-				}
-				fmt.Fprintln(cmd.OutOrStdout(), "")
-				fmt.Fprintln(cmd.OutOrStdout(), "Twist:")
-				fmt.Fprintln(cmd.OutOrStdout(), idea.Twist)
-			}
-
-			os.Exit(0)
-			return nil
-		}
-
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -108,6 +60,5 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&migrate, "migrate", false, "Run database migrations")
-	rootCmd.PersistentFlags().BoolVar(&generate, "generate", false, "Generate one project idea using Gemini")
 	rootCmd.AddCommand(generateCmd)
 }

@@ -1,41 +1,55 @@
 package ai
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
-	"encoding/json"
+	"quibit/internal/model"
 
 	"google.golang.org/genai"
 )
-
-type ProjectIdea struct {
-	Title        string   `json:"title"`
-	Description  string   `json:"description"`
-	Complexity   string   `json:"complexity"`
-	TechStack    []string `json:"tech_stack"`
-	CoreFeatures []string `json:"core_features"`
-	Twist        string   `json:"twist"`
-}
 
 var modelCandidates = []string{
 	"gemini-3-flash-preview",
 	"gemini-2.5-flash",
 }
 
-const projectIdeaPrompt = "Return ONLY valid JSON. Do not include explanation or formatting. Do not include markdown.\n\n" +
-	"Schema (must include ALL fields):\n" +
-	"{\n" +
-	"  \"title\": string,\n" +
-	"  \"description\": string,\n" +
-	"  \"complexity\": \"beginner\" | \"intermediate\" | \"advanced\",\n" +
-	"  \"tech_stack\": string[],\n" +
-	"  \"core_features\": string[],\n" +
-	"  \"twist\": string\n" +
-	"}\n\n" +
-	"Task: Generate one simple software project idea. If unsure, still fill all fields."
+func isValidComplexity(v string) bool {
+	switch v {
+	case "beginner", "intermediate", "advanced":
+		return true
+	default:
+		return false
+	}
+}
+
+func equalStringSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func validateRequiredObjectKeys(obj map[string]json.RawMessage, required []string) error {
+	if len(obj) != len(required) {
+		return fmt.Errorf("invalid JSON: wrong number of fields")
+	}
+	for _, k := range required {
+		if _, ok := obj[k]; !ok {
+			return fmt.Errorf("invalid JSON: missing %s", k)
+		}
+	}
+	return nil
+}
 
 type Generator struct {
 	client *genai.Client
@@ -82,49 +96,89 @@ func (g *Generator) GenerateText(ctx context.Context, prompt string) (string, er
 	return "", fmt.Errorf("generate text: no model candidates available")
 }
 
-func (g *Generator) GenerateProjectIdea(ctx context.Context) (ProjectIdea, error) {
+func (g *Generator) GenerateProjectPlan(ctx context.Context, in model.ProjectInput) (model.ProjectPlan, error) {
 	if g == nil || g.client == nil {
-		return ProjectIdea{}, fmt.Errorf("generate project idea: client is nil")
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: client is nil")
+	}
+	if !isValidComplexity(in.Complexity) {
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: invalid complexity: %s", in.Complexity)
+	}
+	if in.TechStack == nil {
+		in.TechStack = []string{}
 	}
 
-	raw, err := g.GenerateText(ctx, projectIdeaPrompt)
+	raw, err := g.GenerateText(ctx, buildProjectPlanPrompt(in))
 	if err != nil {
-		return ProjectIdea{}, fmt.Errorf("generate project idea: %w", err)
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: %w", err)
 	}
 
 	dec := json.NewDecoder(strings.NewReader(raw))
 	dec.DisallowUnknownFields()
 
-	var idea ProjectIdea
-	if err := dec.Decode(&idea); err != nil {
-		return ProjectIdea{}, fmt.Errorf("generate project idea: invalid JSON: %w", err)
+	var payload json.RawMessage
+	if err := dec.Decode(&payload); err != nil {
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: invalid JSON: %w", err)
 	}
 	if err := dec.Decode(&struct{}{}); err == nil {
-		return ProjectIdea{}, fmt.Errorf("generate project idea: invalid JSON: trailing content")
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: invalid JSON: trailing content")
 	}
 
-	if idea.Title == "" {
-		return ProjectIdea{}, fmt.Errorf("generate project idea: invalid JSON: missing title")
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &top); err != nil {
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: invalid JSON: %w", err)
 	}
-	if idea.Description == "" {
-		return ProjectIdea{}, fmt.Errorf("generate project idea: invalid JSON: missing description")
-	}
-	switch idea.Complexity {
-	case "beginner", "intermediate", "advanced":
-	default:
-		return ProjectIdea{}, fmt.Errorf("generate project idea: invalid JSON: complexity must be beginner|intermediate|advanced")
-	}
-	if len(idea.TechStack) == 0 {
-		return ProjectIdea{}, fmt.Errorf("generate project idea: invalid JSON: missing tech_stack")
-	}
-	if len(idea.CoreFeatures) == 0 {
-		return ProjectIdea{}, fmt.Errorf("generate project idea: invalid JSON: missing core_features")
-	}
-	if idea.Twist == "" {
-		return ProjectIdea{}, fmt.Errorf("generate project idea: invalid JSON: missing twist")
+	if err := validateRequiredObjectKeys(top, []string{
+		"title",
+		"description",
+		"app_type",
+		"complexity",
+		"tech_stack",
+		"goal",
+		"estimated_time",
+		"mvp",
+		"extended_ideas",
+		"possible_challenges",
+		"next_steps",
+	}); err != nil {
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: %w", err)
 	}
 
-	return idea, nil
+	var mvpObj map[string]json.RawMessage
+	if err := json.Unmarshal(top["mvp"], &mvpObj); err != nil {
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: invalid JSON: mvp: %w", err)
+	}
+	if err := validateRequiredObjectKeys(mvpObj, []string{"features", "user_flow", "success_criteria"}); err != nil {
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: mvp: %w", err)
+	}
+
+	dec2 := json.NewDecoder(bytes.NewReader(payload))
+	dec2.DisallowUnknownFields()
+
+	var plan model.ProjectPlan
+	if err := dec2.Decode(&plan); err != nil {
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: invalid JSON: %w", err)
+	}
+
+	if !isValidComplexity(plan.Complexity) {
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: invalid JSON: complexity must be beginner|intermediate|advanced")
+	}
+	if plan.AppType != in.AppType {
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: invalid JSON: app_type must match input")
+	}
+	if plan.Complexity != in.Complexity {
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: invalid JSON: complexity must match input")
+	}
+	if !equalStringSlice(plan.TechStack, in.TechStack) {
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: invalid JSON: tech_stack must match input")
+	}
+	if plan.Goal != in.Goal {
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: invalid JSON: goal must match input")
+	}
+	if plan.EstimatedTime != in.Timeframe {
+		return model.ProjectPlan{}, fmt.Errorf("generate project plan: invalid JSON: estimated_time must match input")
+	}
+
+	return plan, nil
 }
 
 func isOverloadedError(err error) bool {
