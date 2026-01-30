@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"os"
 
+	"quibit/internal/ai"
 	"quibit/internal/db"
 
 	"github.com/spf13/cobra"
 )
 
 var migrate bool
+var generate bool
 
 var rootCmd = &cobra.Command{
 	Use:           "quibit",
@@ -17,31 +19,59 @@ var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if !migrate {
+		if migrate {
+			{
+				ctx := cmd.Context()
+				fmt.Fprintln(cmd.OutOrStdout(), "Running database migrations...")
+				gdb, err := db.Connect(ctx)
+				if err != nil {
+					return fmt.Errorf("migrate: %w", err)
+				}
+
+				sqlDB, err := gdb.DB()
+				if err != nil {
+					return fmt.Errorf("migrate: get sql db: %w", err)
+				}
+
+				if err := db.AutoMigrate(ctx, gdb); err != nil {
+					return fmt.Errorf("migrate: %w", err)
+				}
+				if err := sqlDB.Close(); err != nil {
+					return fmt.Errorf("migrate: close sql db: %w", err)
+				}
+				fmt.Fprintln(cmd.OutOrStdout(), "Database migrations completed.")
+			}
+
+			os.Exit(0)
 			return nil
 		}
 
-		ctx := cmd.Context()
-		fmt.Fprintln(cmd.OutOrStdout(), "Running database migrations...")
-		gdb, err := db.Connect(ctx)
-		if err != nil {
-			return fmt.Errorf("migrate: %w", err)
-		}
+		if generate {
+			{
+				ctx := cmd.Context()
+				fmt.Fprintln(cmd.OutOrStdout(), "Connecting to Gemini...")
+				client, err := ai.NewGeminiClient(ctx)
+				if err != nil {
+					return fmt.Errorf("generate: %w", err)
+				}
+				fmt.Fprintln(cmd.OutOrStdout(), "Gemini connected.")
 
-		sqlDB, err := gdb.DB()
-		if err != nil {
-			return fmt.Errorf("migrate: get sql db: %w", err)
-		}
+				g, err := ai.NewGenerator(client)
+				if err != nil {
+					return fmt.Errorf("generate: %w", err)
+				}
 
-		if err := db.AutoMigrate(ctx, gdb); err != nil {
-			return fmt.Errorf("migrate: %w", err)
-		}
-		if err := sqlDB.Close(); err != nil {
-			return fmt.Errorf("migrate: close sql db: %w", err)
-		}
-		fmt.Fprintln(cmd.OutOrStdout(), "Database migrations completed.")
+				out, err := g.GenerateText(ctx, "Generate one simple software project idea.")
+				if err != nil {
+					return fmt.Errorf("generate: %w", err)
+				}
 
-		os.Exit(0)
+				fmt.Fprintln(cmd.OutOrStdout(), out)
+			}
+
+			os.Exit(0)
+			return nil
+		}
 
 		return nil
 	},
@@ -59,5 +89,6 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&migrate, "migrate", false, "Run database migrations")
+	rootCmd.PersistentFlags().BoolVar(&generate, "generate", false, "Generate one project idea using Gemini")
 	rootCmd.AddCommand(generateCmd)
 }
