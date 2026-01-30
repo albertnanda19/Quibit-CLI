@@ -60,13 +60,32 @@ var rootCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("generate: %w", err)
 				}
-
-				out, err := g.GenerateText(ctx, "Generate one simple software project idea.")
+				idea, err := g.GenerateProjectIdea(ctx)
 				if err != nil {
 					return fmt.Errorf("generate: %w", err)
 				}
 
-				fmt.Fprintln(cmd.OutOrStdout(), out)
+				fmt.Fprintln(cmd.OutOrStdout(), "Title:")
+				fmt.Fprintln(cmd.OutOrStdout(), idea.Title)
+				fmt.Fprintln(cmd.OutOrStdout(), "")
+				fmt.Fprintln(cmd.OutOrStdout(), "Description:")
+				fmt.Fprintln(cmd.OutOrStdout(), idea.Description)
+				fmt.Fprintln(cmd.OutOrStdout(), "")
+				fmt.Fprintln(cmd.OutOrStdout(), "Complexity:")
+				fmt.Fprintln(cmd.OutOrStdout(), idea.Complexity)
+				fmt.Fprintln(cmd.OutOrStdout(), "")
+				fmt.Fprintln(cmd.OutOrStdout(), "Tech Stack:")
+				for _, item := range idea.TechStack {
+					fmt.Fprintf(cmd.OutOrStdout(), "- %s\n", item)
+				}
+				fmt.Fprintln(cmd.OutOrStdout(), "")
+				fmt.Fprintln(cmd.OutOrStdout(), "Core Features:")
+				for _, item := range idea.CoreFeatures {
+					fmt.Fprintf(cmd.OutOrStdout(), "- %s\n", item)
+				}
+				fmt.Fprintln(cmd.OutOrStdout(), "")
+				fmt.Fprintln(cmd.OutOrStdout(), "Twist:")
+				fmt.Fprintln(cmd.OutOrStdout(), idea.Twist)
 			}
 
 			os.Exit(0)
