@@ -290,11 +290,69 @@ func saveGeneratedProject(ctx context.Context, input model.ProjectInput, idea ai
 		CreatedAt: time.Now(),
 	}
 
-	if err := gdb.Create(&row).Error; err != nil {
+	tx := gdb.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("generate: save project: begin transaction: %w", tx.Error)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := tx.Create(&row).Error; err != nil {
 		if isUniqueViolation(err) {
 			return errDuplicateDNA
 		}
 		return fmt.Errorf("generate: save project: %w", err)
+	}
+
+	// Persist structured feature lists to project_features so nothing is lost in downstream usage.
+	var features []pmodels.ProjectFeature
+	appendFeatures := func(typ string, items []string) {
+		for _, v := range items {
+			v = strings.TrimSpace(v)
+			if v == "" {
+				continue
+			}
+			features = append(features, pmodels.ProjectFeature{
+				ID:          uuid.New(),
+				ProjectID:   row.ID,
+				Type:        typ,
+				Description: v,
+			})
+		}
+	}
+	appendFeatures("mvp_must_have", idea.Project.MVP.MustHave)
+	appendFeatures("mvp_nice_to_have", idea.Project.MVP.NiceToHave)
+	appendFeatures("out_of_scope", idea.Project.MVP.OutOfScope)
+	appendFeatures("future_extension", idea.Project.Future)
+	appendFeatures("learning_outcome", idea.Project.Learning)
+	appendFeatures("key_benefit", idea.Project.ValueProp.KeyBenefits)
+
+	if len(features) > 0 {
+		if err := tx.Create(&features).Error; err != nil {
+			return fmt.Errorf("generate: save project features: %w", err)
+		}
+	}
+
+	// Also store a compact meta record (in addition to raw_ai_output on projects) for easy querying.
+	targetUsersJSON, err := json.Marshal(map[string]any{
+		"primary":   idea.Project.TargetUsers.Primary,
+		"secondary": idea.Project.TargetUsers.Secondary,
+		"use_cases": idea.Project.TargetUsers.UseCases,
+	})
+	if err != nil {
+		return fmt.Errorf("generate: marshal target users: %w", err)
+	}
+	metaRow := pmodels.ProjectMeta{
+		ProjectID:   row.ID,
+		TargetUsers: string(targetUsersJSON),
+		TechStack:   strings.Join(stack, ", "),
+		RawAIOutput: rawJSON,
+	}
+	if err := tx.Create(&metaRow).Error; err != nil {
+		return fmt.Errorf("generate: save project meta: %w", err)
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return fmt.Errorf("generate: save project: commit: %w", err)
 	}
 
 	return nil
