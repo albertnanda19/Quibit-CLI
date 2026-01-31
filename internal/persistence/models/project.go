@@ -7,14 +7,17 @@ import (
 )
 
 type Project struct {
-	ID         uuid.UUID `gorm:"type:uuid;primaryKey"`
-	Title      string    `gorm:"not null"`
-	Summary    string    `gorm:"not null"`
-	DNAHash    string    `gorm:"not null;uniqueIndex"`
-	Complexity string    `gorm:"not null"`
-	Duration   string    `gorm:"not null"`
-	AIProvider string    `gorm:"not null"`
-	CreatedAt  time.Time `gorm:"not null"`
+	ID               uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	Title            string     `gorm:"not null"`
+	Summary          string     `gorm:"not null"`
+	DNAHash          string     `gorm:"not null;uniqueIndex"`
+	SimilarityScore  float64    `gorm:"not null;default:0"`
+	SimilarProjectID *uuid.UUID `gorm:"type:uuid"`
+	PivotReason      *string    `gorm:"type:text"`
+	Complexity       string     `gorm:"not null"`
+	Duration         string     `gorm:"not null"`
+	AIProvider       string     `gorm:"not null"`
+	CreatedAt        time.Time  `gorm:"not null"`
 }
 
 func (Project) TableName() string {

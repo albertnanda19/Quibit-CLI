@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,10 +31,13 @@ func NewProjectRepository(db *gorm.DB) (*ProjectRepository, error) {
 }
 
 type SaveParams struct {
-	Project    domain.Project
-	DNAHash    string
-	AIProvider string
-	RawAIJSON  string
+	Project          domain.Project
+	DNAHash          string
+	AIProvider       string
+	RawAIJSON        string
+	SimilarityScore  float64
+	SimilarProjectID *uuid.UUID
+	PivotReason      *string
 }
 
 func (r *ProjectRepository) Save(ctx context.Context, p SaveParams) (uuid.UUID, error) {
@@ -66,14 +71,17 @@ func (r *ProjectRepository) Save(ctx context.Context, p SaveParams) (uuid.UUID, 
 	}()
 
 	row := models.Project{
-		ID:         projectID,
-		Title:      p.Project.Title,
-		Summary:    p.Project.Summary,
-		DNAHash:    p.DNAHash,
-		Complexity: p.Project.EstimatedComplexity,
-		Duration:   p.Project.EstimatedDuration,
-		AIProvider: p.AIProvider,
-		CreatedAt:  now,
+		ID:               projectID,
+		Title:            p.Project.Title,
+		Summary:          p.Project.Summary,
+		DNAHash:          p.DNAHash,
+		SimilarityScore:  p.SimilarityScore,
+		SimilarProjectID: p.SimilarProjectID,
+		PivotReason:      p.PivotReason,
+		Complexity:       p.Project.EstimatedComplexity,
+		Duration:         p.Project.EstimatedDuration,
+		AIProvider:       p.AIProvider,
+		CreatedAt:        now,
 	}
 	if err := tx.Create(&row).Error; err != nil {
 		if isUniqueViolation(err) {
@@ -142,4 +150,52 @@ func isUniqueViolation(err error) bool {
 		return true
 	}
 	return false
+}
+
+type SimilarityCandidate struct {
+	ID      uuid.UUID
+	Project domain.Project
+}
+
+func (r *ProjectRepository) ListRecentForSimilarity(ctx context.Context, limit int) ([]SimilarityCandidate, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("list recent: ctx is nil")
+	}
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("list recent: repository is not initialized")
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	if v := os.Getenv("SIMILARITY_LOOKBACK_N"); v != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n > 0 {
+			limit = n
+		}
+	}
+
+	var rows []struct {
+		ID        uuid.UUID
+		RawAIJSON string
+	}
+	q := r.db.WithContext(ctx).
+		Table("projects").
+		Select("projects.id as id, project_meta.raw_ai_output as raw_ai_json").
+		Joins("join project_meta on project_meta.project_id = projects.id").
+		Order("projects.created_at desc").
+		Limit(limit)
+
+	if err := q.Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("list recent: %w", err)
+	}
+
+	out := make([]SimilarityCandidate, 0, len(rows))
+	for _, row := range rows {
+		var p domain.Project
+		if err := json.Unmarshal([]byte(row.RawAIJSON), &p); err != nil {
+			return nil, fmt.Errorf("list recent: parse raw_ai_output: %w", err)
+		}
+		out = append(out, SimilarityCandidate{ID: row.ID, Project: p})
+	}
+
+	return out, nil
 }

@@ -10,7 +10,9 @@ import (
 	"quibit/internal/dna"
 	"quibit/internal/input"
 	"quibit/internal/persistence/repository"
+	"quibit/internal/similarity"
 
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -39,9 +41,19 @@ var generateCmd = &cobra.Command{
 			return fmt.Errorf("generate: %w", err)
 		}
 
+		thresholds := similarity.LoadThresholdsFromEnv()
+		var pendingPivotReason *string
+		var pivotPrompt string
+
 	outer:
 		for {
-			generated, err := pg.Generate(ctx, currentInput)
+			var generated ai.GeneratedProject
+			if pivotPrompt != "" {
+				generated, err = pg.GenerateWithPivot(ctx, currentInput, pivotPrompt)
+				pivotPrompt = ""
+			} else {
+				generated, err = pg.Generate(ctx, currentInput)
+			}
 			if err != nil {
 				return fmt.Errorf("generate: %w", err)
 			}
@@ -73,11 +85,75 @@ var generateCmd = &cobra.Command{
 						return fmt.Errorf("generate: %w", err)
 					}
 
+					candidates, err := repo.ListRecentForSimilarity(ctx, 0)
+					if err != nil {
+						_ = sqlDB.Close()
+						return fmt.Errorf("generate: %w", err)
+					}
+
+					bestScore := 0.0
+					var bestID *repository.SimilarityCandidate
+					bestBreakdown := similarity.Breakdown{}
+					for i := range candidates {
+						b := similarity.Score(generated.Project, candidates[i].Project)
+						if b.Total > bestScore {
+							bestScore = b.Total
+							bestBreakdown = b
+							bestID = &candidates[i]
+						}
+					}
+
+					cat := similarity.Categorize(bestScore, thresholds)
+					if cat != similarity.CategoryAcceptable {
+						score := bestScore
+						act, err := cli.PromptSimilarityResolution(inReader, out, score)
+						if err != nil {
+							_ = sqlDB.Close()
+							return fmt.Errorf("generate: %w", err)
+						}
+						_ = sqlDB.Close()
+
+						switch act {
+						case cli.SimilarityActionAutoPivot:
+							if bestID != nil {
+								dominant := similarity.DominantDimension(bestBreakdown)
+								pivot := ai.BuildPivot(dominant, bestID.Project)
+								pendingPivotReason = &pivot.Reason
+								pivotPrompt = pivot.Prompt
+							}
+							continue outer
+
+						case cli.SimilarityActionModifyInputs:
+							updated, err := cli.RunWizard()
+							if err != nil {
+								return fmt.Errorf("generate: %w", err)
+							}
+							currentInput = updated
+							pendingPivotReason = nil
+							pivotPrompt = ""
+							continue outer
+
+						case cli.SimilarityActionCancel:
+							return nil
+
+						default:
+							return fmt.Errorf("generate: invalid similarity action")
+						}
+					}
+
+					var similarProjectIDPtr *uuid.UUID
+					if bestID != nil {
+						similarProjectIDPtr = &bestID.ID
+					}
+
 					_, err = repo.Save(ctx, repository.SaveParams{
-						Project:    generated.Project,
-						DNAHash:    dnaHash,
-						AIProvider: "gemini",
-						RawAIJSON:  generated.RawJSON,
+						Project:          generated.Project,
+						DNAHash:          dnaHash,
+						AIProvider:       "gemini",
+						RawAIJSON:        generated.RawJSON,
+						SimilarityScore:  bestScore,
+						SimilarProjectID: similarProjectIDPtr,
+						PivotReason:      pendingPivotReason,
 					})
 					if err != nil {
 						_ = sqlDB.Close()
@@ -95,6 +171,8 @@ var generateCmd = &cobra.Command{
 
 				case cli.NextActionRegenerateSameInputs:
 					fmt.Fprintln(out, "")
+					pendingPivotReason = nil
+					pivotPrompt = ""
 					continue outer
 
 				case cli.NextActionRegenerateModifiedInputs:
@@ -104,6 +182,8 @@ var generateCmd = &cobra.Command{
 					}
 					currentInput = updated
 					fmt.Fprintln(out, "")
+					pendingPivotReason = nil
+					pivotPrompt = ""
 					continue outer
 
 				case cli.NextActionCancel:

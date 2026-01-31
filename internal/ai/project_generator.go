@@ -26,10 +26,16 @@ func NewProjectGenerator(client *genai.Client) (*ProjectGenerator, error) {
 	return &ProjectGenerator{g: g}, nil
 }
 
-func buildProjectProposalPrompt(in model.ProjectInput) string {
+func buildProjectProposalPrompt(in model.ProjectInput, pivot string) string {
 	techStackJSON, err := json.Marshal(in.TechStack)
 	if err != nil {
 		techStackJSON = []byte("[]")
+	}
+
+	pivot = strings.TrimSpace(pivot)
+	pivotBlock := ""
+	if pivot != "" {
+		pivotBlock = "Additional Constraints:\n" + pivot + "\n\n"
 	}
 
 	return "Return ONLY valid JSON. Do not include explanation, formatting, markdown, or extra text.\n" +
@@ -46,6 +52,7 @@ func buildProjectProposalPrompt(in model.ProjectInput) string {
 		"- estimated_duration must match estimated_duration exactly as provided.\n" +
 		"- Fill EVERY field in the schema.\n" +
 		"- Do NOT add, remove, or rename any fields.\n\n" +
+		pivotBlock +
 		"Schema (must include ALL fields):\n" +
 		"{\n" +
 		"  \"title\": string,\n" +
@@ -67,11 +74,19 @@ type GeneratedProject struct {
 }
 
 func (pg *ProjectGenerator) Generate(ctx context.Context, in model.ProjectInput) (GeneratedProject, error) {
+	return pg.generate(ctx, in, "")
+}
+
+func (pg *ProjectGenerator) GenerateWithPivot(ctx context.Context, in model.ProjectInput, pivot string) (GeneratedProject, error) {
+	return pg.generate(ctx, in, pivot)
+}
+
+func (pg *ProjectGenerator) generate(ctx context.Context, in model.ProjectInput, pivot string) (GeneratedProject, error) {
 	if pg == nil || pg.g == nil {
 		return GeneratedProject{}, fmt.Errorf("project generator: not initialized")
 	}
 
-	raw, err := pg.g.GenerateText(ctx, buildProjectProposalPrompt(in))
+	raw, err := pg.g.GenerateText(ctx, buildProjectProposalPrompt(in, pivot))
 	if err != nil {
 		return GeneratedProject{}, fmt.Errorf("generate project proposal: %w", err)
 	}
