@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -73,6 +74,7 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 	var pendingStrategy ai.PivotStrategy
 	var lastReasonUsed *ai.RetryReason
 	var lastMeta ai.AIResult
+generateLoop:
 	for {
 		fmt.Fprintln(out, "")
 		fmt.Fprintln(out, "Generating idea with AI")
@@ -221,9 +223,30 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 			}
 			fmt.Fprintln(out, "")
 			fmt.Fprintln(out, "Project saved.")
-			_, _ = tui.SelectOption(in, out, "Next action:", []tui.Option{
-				{ID: "back", Label: "Back"},
-			})
+			for {
+				after, _ := tui.SelectOption(in, out, "Next action:", []tui.Option{
+					{ID: "copy", Label: "Copy output to clipboard"},
+					{ID: "same", Label: "Generate another project (same inputs)"},
+					{ID: "back", Label: "Back"},
+				})
+				switch after.ID {
+				case "copy":
+					var buf bytes.Buffer
+					printIdea(&buf, idea)
+					if err := tui.CopyToClipboard(out, buf.String()); err != nil {
+						fmt.Fprintf(out, "Copy failed: %v\n", err)
+						continue
+					}
+					fmt.Fprintln(out, "Copied to clipboard.")
+				case "same":
+					// Keep the same input; just run generation again.
+					pendingReason = nil
+					lastReasonUsed = nil
+					continue generateLoop
+				default:
+					return nil
+				}
+			}
 			return nil
 		case "regenerate":
 			pendingReason = ptrRetry(ai.RetryUserRejected)
@@ -761,12 +784,6 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if len(evolutions) == 0 {
-		_, _ = tui.SelectOption(os.Stdin, out, "Next action:", []tui.Option{
-			{ID: "back", Label: "Back"},
-		})
-		return nil
-	}
 
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "Saved Evolutions")
@@ -780,9 +797,37 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 		printEvolution(out, evo)
 	}
 
-	_, _ = tui.SelectOption(os.Stdin, out, "Next action:", []tui.Option{
-		{ID: "back", Label: "Back"},
-	})
+	for {
+		after, _ := tui.SelectOption(os.Stdin, out, "Next action:", []tui.Option{
+			{ID: "copy", Label: "Copy output to clipboard"},
+			{ID: "back", Label: "Back"},
+		})
+		switch after.ID {
+		case "copy":
+			var buf bytes.Buffer
+			printIdea(&buf, idea)
+			if len(evolutions) > 0 {
+				fmt.Fprintln(&buf, "")
+				fmt.Fprintln(&buf, "Saved Evolutions")
+				for i := range evolutions {
+					var evo ai.ProjectEvolution
+					if err := json.Unmarshal([]byte(evolutions[i].RawAIOutput), &evo); err != nil {
+						return fmt.Errorf("view: parse saved evolution: %w", err)
+					}
+					fmt.Fprintln(&buf, "")
+					fmt.Fprintf(&buf, "Evolution #%d\n", i+1)
+					printEvolution(&buf, evo)
+				}
+			}
+			if err := tui.CopyToClipboard(out, buf.String()); err != nil {
+				fmt.Fprintf(out, "Copy failed: %v\n", err)
+				continue
+			}
+			fmt.Fprintln(out, "Copied to clipboard.")
+		default:
+			return nil
+		}
+	}
 	return nil
 }
 
