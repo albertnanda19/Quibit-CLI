@@ -120,7 +120,7 @@ func buildOptions(p SelectPrompt) []tui.Option {
 func buildOptionsOptional(p SelectPrompt) []tui.Option {
 	// Default selection should be "skip" so pressing Enter preserves current behavior.
 	options := []tui.Option{
-		{ID: "skip", Label: "Skip (no preference)"},
+		{ID: "skip", Label: p.Default.Label},
 		{ID: "custom", Label: p.CustomLabel},
 	}
 	for _, opt := range p.Options {

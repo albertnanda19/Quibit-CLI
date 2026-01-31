@@ -42,7 +42,7 @@ var ProjectKindPrompt = SelectPrompt{
 		{Label: "AI project / AI-powered app", Value: "ai-project"},
 	},
 	CustomLabel: "Custom",
-	Default:     SelectOption{Label: "Skip (no preference)", Value: ""},
+	Default:     SelectOption{Label: "Skip (AI will recommend)", Value: ""},
 }
 
 var ComplexityPrompt = SelectPrompt{

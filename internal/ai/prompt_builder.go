@@ -17,6 +17,10 @@ func buildProjectPlanPrompt(in model.ProjectInput) string {
 	if projectKind != "" {
 		projectKindLine = "- project_kind: " + projectKind + "\n"
 	}
+	projectKindRule := ""
+	if projectKind == "" {
+		projectKindRule = "- If project_kind is not provided, you MUST infer a suitable software category based on tech_stack and typical real-world use.\n"
+	}
 	dbPref := strings.TrimSpace(in.Database)
 	dbLine := ""
 	if dbPref != "" && strings.ToLower(dbPref) != "none" {
@@ -37,6 +41,7 @@ func buildProjectPlanPrompt(in model.ProjectInput) string {
 		"- goal: " + in.Goal + "\n" +
 		"- estimated_time: " + in.Timeframe + "\n\n" +
 		"Rules:\n" +
+		projectKindRule +
 		"- Use app_type exactly as provided.\n" +
 		"- Use complexity exactly as provided (must be beginner|intermediate|advanced).\n" +
 		"- Use tech_stack exactly as provided (do not add new items).\n" +

@@ -233,6 +233,10 @@ generateLoop:
 				case "copy":
 					var buf bytes.Buffer
 					printIdea(&buf, idea)
+					fmt.Fprintln(&buf, "")
+					fmt.Fprintln(&buf, "----")
+					fmt.Fprintln(&buf, "Raw JSON")
+					fmt.Fprintln(&buf, rawJSON)
 					if err := tui.CopyToClipboard(out, buf.String()); err != nil {
 						fmt.Fprintf(out, "Copy failed: %v\n", err)
 						continue
@@ -817,8 +821,16 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 					fmt.Fprintln(&buf, "")
 					fmt.Fprintf(&buf, "Evolution #%d\n", i+1)
 					printEvolution(&buf, evo)
+					fmt.Fprintln(&buf, "")
+					fmt.Fprintln(&buf, "----")
+					fmt.Fprintln(&buf, "Evolution Raw JSON")
+					fmt.Fprintln(&buf, evolutions[i].RawAIOutput)
 				}
 			}
+			fmt.Fprintln(&buf, "")
+			fmt.Fprintln(&buf, "----")
+			fmt.Fprintln(&buf, "Project Raw JSON")
+			fmt.Fprintln(&buf, selected.RawAIOutput)
 			if err := tui.CopyToClipboard(out, buf.String()); err != nil {
 				fmt.Fprintf(out, "Copy failed: %v\n", err)
 				continue
