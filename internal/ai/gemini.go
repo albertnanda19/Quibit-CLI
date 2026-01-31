@@ -90,7 +90,7 @@ func GenerateProjectIdeaWithMeta(ctx context.Context, in model.ProjectInput) (Pr
 func GenerateProjectIdeaWithPivot(ctx context.Context, in model.ProjectInput, reason RetryReason, strategy PivotStrategy) (ProjectIdea, string, error) {
 	idea, raw, _, err := GenerateProjectIdeaWithPivotMeta(ctx, in, reason, strategy)
 	return idea, raw, err
-}
+	}
 
 func GenerateProjectIdeaWithPivotMeta(ctx context.Context, in model.ProjectInput, reason RetryReason, strategy PivotStrategy) (ProjectIdea, string, AIResult, error) {
 	m, err := newDefaultProviderManager()
@@ -103,7 +103,7 @@ func GenerateProjectIdeaWithPivotMeta(ctx context.Context, in model.ProjectInput
 func GenerateProjectEvolution(ctx context.Context, in EvolutionInput) (ProjectEvolution, string, error) {
 	evo, raw, _, err := GenerateProjectEvolutionWithMeta(ctx, in)
 	return evo, raw, err
-}
+	}
 
 func GenerateProjectEvolutionWithMeta(ctx context.Context, in EvolutionInput) (ProjectEvolution, string, AIResult, error) {
 	m, err := newDefaultProviderManager()

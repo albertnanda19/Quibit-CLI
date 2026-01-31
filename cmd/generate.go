@@ -29,26 +29,37 @@ var generateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		out := cmd.OutOrStdout()
 		ctx := cmd.Context()
-		options := []tui.Option{
-			{ID: "new", Label: "Generate New Project"},
-			{ID: "continue", Label: "Continue Existing Project"},
-			{ID: "view", Label: "View Saved Projects"},
-		}
+		for {
+			options := []tui.Option{
+				{ID: "new", Label: "Generate New Project"},
+				{ID: "continue", Label: "Continue Existing Project"},
+				{ID: "view", Label: "View Saved Projects"},
+				{ID: "exit", Label: "Exit"},
+			}
 
-		selection, err := tui.SelectOption(os.Stdin, out, "Select mode:", options)
-		if err != nil {
-			return fmt.Errorf("generate: %w", err)
-		}
+			selection, err := tui.SelectOption(os.Stdin, out, "Select mode:", options)
+			if err != nil {
+				return fmt.Errorf("generate: %w", err)
+			}
 
-		switch selection.ID {
-		case "new":
-			return runGenerateNew(ctx, os.Stdin, out)
-		case "continue":
-			return runContinueExisting(ctx, os.Stdin, out)
-		case "view":
-			return runViewSavedProjects(ctx, out)
-		default:
-			return fmt.Errorf("generate: invalid selection")
+			switch selection.ID {
+			case "new":
+				if err := runGenerateNew(ctx, os.Stdin, out); err != nil {
+					return err
+				}
+			case "continue":
+				if err := runContinueExisting(ctx, os.Stdin, out); err != nil {
+					return err
+				}
+			case "view":
+				if err := runViewSavedProjects(ctx, out); err != nil {
+					return err
+				}
+			case "exit":
+				return nil
+			default:
+				return fmt.Errorf("generate: invalid selection")
+			}
 		}
 	},
 }
@@ -191,7 +202,7 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 			{ID: "accept", Label: "Accept"},
 			{ID: "regenerate", Label: "Regenerate"},
 			{ID: "regenerate_harder", Label: "Regenerate (higher complexity)"},
-			{ID: "cancel", Label: "Cancel"},
+			{ID: "back", Label: "Back"},
 		})
 		if err != nil {
 			return err
@@ -210,6 +221,9 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 			}
 			fmt.Fprintln(out, "")
 			fmt.Fprintln(out, "Project saved.")
+			_, _ = tui.SelectOption(in, out, "Next action:", []tui.Option{
+				{ID: "back", Label: "Back"},
+			})
 			return nil
 		case "regenerate":
 			pendingReason = ptrRetry(ai.RetryUserRejected)
@@ -220,7 +234,7 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 			pendingReason = ptrRetry(ai.RetryUserRejected)
 			pendingStrategy = selectPivotStrategy(ai.RetryUserRejected)
 			continue
-		case "cancel":
+		case "back":
 			return nil
 		default:
 			return fmt.Errorf("generate: invalid selection")
@@ -643,7 +657,7 @@ func runProjectEvolution(ctx context.Context, out io.Writer, selected *pmodels.P
 		selection, err := tui.SelectOption(os.Stdin, out, "Next action:", []tui.Option{
 			{ID: "accept", Label: "Accept"},
 			{ID: "regenerate", Label: "Regenerate"},
-			{ID: "cancel", Label: "Cancel"},
+			{ID: "back", Label: "Back"},
 		})
 		if err != nil {
 			return err
@@ -657,7 +671,7 @@ func runProjectEvolution(ctx context.Context, out io.Writer, selected *pmodels.P
 			return nil
 		case "regenerate":
 			continue
-		case "cancel":
+		case "back":
 			return nil
 		default:
 			return fmt.Errorf("continue: invalid selection")
@@ -748,6 +762,9 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 		return err
 	}
 	if len(evolutions) == 0 {
+		_, _ = tui.SelectOption(os.Stdin, out, "Next action:", []tui.Option{
+			{ID: "back", Label: "Back"},
+		})
 		return nil
 	}
 
@@ -763,6 +780,9 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 		printEvolution(out, evo)
 	}
 
+	_, _ = tui.SelectOption(os.Stdin, out, "Next action:", []tui.Option{
+		{ID: "back", Label: "Back"},
+	})
 	return nil
 }
 
