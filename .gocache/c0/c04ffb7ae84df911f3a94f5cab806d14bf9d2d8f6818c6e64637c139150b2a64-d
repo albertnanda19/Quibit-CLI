@@ -1,0 +1,12 @@
+./client.go
+./gemini.go
+./gemini_client.go
+./generator.go
+./huggingface.go
+./manager.go
+./normalize.go
+./pivot_strategy.go
+./project_generator.go
+./prompt_builder.go
+./prompt_contract.go
+./provider.go
