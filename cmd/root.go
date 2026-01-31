@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"quibit/internal/db"
+	"quibit/internal/persistence"
 
 	"github.com/spf13/cobra"
 )
@@ -31,7 +32,7 @@ var rootCmd = &cobra.Command{
 					return fmt.Errorf("migrate: get sql db: %w", err)
 				}
 
-				if err := db.AutoMigrate(ctx, gdb); err != nil {
+				if err := persistence.AutoMigrate(ctx, gdb); err != nil {
 					return fmt.Errorf("migrate: %w", err)
 				}
 				if err := sqlDB.Close(); err != nil {

@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
+
+	"quibit/internal/config"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -14,7 +15,7 @@ import (
 func Connect(ctx context.Context) (*gorm.DB, error) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		_ = loadDotEnv(".env")
+		_ = config.LoadDotEnv(".env")
 		databaseURL = os.Getenv("DATABASE_URL")
 	}
 	if databaseURL == "" {
@@ -29,37 +30,4 @@ func Connect(ctx context.Context) (*gorm.DB, error) {
 	}
 
 	return db.WithContext(ctx), nil
-}
-
-func loadDotEnv(path string) error {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-
-	lines := strings.Split(string(b), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		key, value, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		if key == "" {
-			continue
-		}
-
-		value = strings.Trim(value, "\"'")
-		if _, exists := os.LookupEnv(key); exists {
-			continue
-		}
-		_ = os.Setenv(key, value)
-	}
-
-	return nil
 }
