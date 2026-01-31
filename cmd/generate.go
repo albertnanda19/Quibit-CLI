@@ -190,6 +190,7 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 		selection, err := tui.SelectOption(in, out, "Next action:", []tui.Option{
 			{ID: "accept", Label: "Accept"},
 			{ID: "regenerate", Label: "Regenerate"},
+			{ID: "regenerate_harder", Label: "Regenerate (higher complexity)"},
 			{ID: "cancel", Label: "Cancel"},
 		})
 		if err != nil {
@@ -211,6 +212,11 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 			fmt.Fprintln(out, "Project saved.")
 			return nil
 		case "regenerate":
+			pendingReason = ptrRetry(ai.RetryUserRejected)
+			pendingStrategy = selectPivotStrategy(ai.RetryUserRejected)
+			continue
+		case "regenerate_harder":
+			input.Complexity = bumpComplexity(input.Complexity)
 			pendingReason = ptrRetry(ai.RetryUserRejected)
 			pendingStrategy = selectPivotStrategy(ai.RetryUserRejected)
 			continue
@@ -486,6 +492,21 @@ func selectPivotStrategy(reason ai.RetryReason) ai.PivotStrategy {
 
 func ptrRetry(r ai.RetryReason) *ai.RetryReason {
 	return &r
+}
+
+func bumpComplexity(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	switch v {
+	case "beginner":
+		return "intermediate"
+	case "intermediate":
+		return "advanced"
+	case "advanced":
+		return "advanced"
+	default:
+		// Preserve current behavior if user entered a custom complexity string.
+		return strings.TrimSpace(v)
+	}
 }
 
 func isUniqueViolation(err error) bool {
