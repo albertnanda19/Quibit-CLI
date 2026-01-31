@@ -20,6 +20,12 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 	}
 	printDivider(out)
 
+	projectKind, err := promptSelectOptionalWithCustom(in, out, reader, ProjectKindPrompt)
+	if err != nil {
+		return model.ProjectInput{}, err
+	}
+	printDivider(out)
+
 	complexity, err := promptSelectWithCustom(in, out, reader, ComplexityPrompt)
 	if err != nil {
 		return model.ProjectInput{}, err
@@ -45,11 +51,12 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 	}
 
 	return model.ProjectInput{
-		AppType:    appType,
-		Complexity: complexity,
-		TechStack:  techStack,
-		Goal:       goal,
-		Timeframe:  timeframe,
+		AppType:     appType,
+		ProjectKind: projectKind,
+		Complexity:  complexity,
+		TechStack:   techStack,
+		Goal:        goal,
+		Timeframe:   timeframe,
 	}, nil
 }
 
@@ -66,6 +73,28 @@ func promptSelectWithCustom(in *os.File, out io.Writer, reader *bufio.Reader, p 
 	return promptWithDefault(reader, out, "Custom input", p.Default.Value)
 }
 
+func promptSelectOptionalWithCustom(in *os.File, out io.Writer, reader *bufio.Reader, p SelectPrompt) (string, error) {
+	printHeader(out, p.Title, p.Description)
+	options := buildOptionsOptional(p)
+	selection, err := tui.SelectOptionWithDefault(in, out, "Use arrow keys, Enter to confirm.", options, "skip")
+	if err != nil {
+		return "", err
+	}
+	switch selection.ID {
+	case "skip":
+		return "", nil
+	case "custom":
+		v, err := promptWithDefault(reader, out, "Custom input (leave empty to skip)", "")
+		if err != nil {
+			return "", err
+		}
+		v = strings.TrimSpace(v)
+		return v, nil
+	default:
+		return selection.ID, nil
+	}
+}
+
 func buildOptions(p SelectPrompt) []tui.Option {
 	options := make([]tui.Option, 0, len(p.Options)+1)
 	options = append(options, tui.Option{
@@ -77,6 +106,22 @@ func buildOptions(p SelectPrompt) []tui.Option {
 			ID:    opt.Value,
 			Label: opt.Label,
 		})
+	}
+	return options
+}
+
+func buildOptionsOptional(p SelectPrompt) []tui.Option {
+	// Default selection should be "skip" so pressing Enter preserves current behavior.
+	options := []tui.Option{
+		{ID: "skip", Label: "Skip (no preference)"},
+		{ID: "custom", Label: p.CustomLabel},
+	}
+	for _, opt := range p.Options {
+		// If prompt already included a skip entry, avoid duplicating it.
+		if strings.TrimSpace(opt.Value) == "" {
+			continue
+		}
+		options = append(options, tui.Option{ID: opt.Value, Label: opt.Label})
 	}
 	return options
 }

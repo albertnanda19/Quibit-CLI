@@ -2,6 +2,7 @@ package ai
 
 import (
 	"encoding/json"
+	"strings"
 
 	"quibit/internal/model"
 )
@@ -11,11 +12,17 @@ func buildProjectPlanPrompt(in model.ProjectInput) string {
 	if err != nil {
 		techStackJSON = []byte("[]")
 	}
+	projectKind := strings.TrimSpace(in.ProjectKind)
+	projectKindLine := ""
+	if projectKind != "" {
+		projectKindLine = "- project_kind: " + projectKind + "\n"
+	}
 
 	return "Return ONLY valid JSON. Do not include explanation, formatting, markdown, or extra text.\n" +
 		"You MUST return exactly one JSON object and nothing else.\n\n" +
 		"User Input (use these as constraints):\n" +
 		"- app_type: " + in.AppType + "\n" +
+		projectKindLine +
 		"- complexity: " + in.Complexity + "\n" +
 		"- tech_stack: " + string(techStackJSON) + "\n" +
 		"- goal: " + in.Goal + "\n" +

@@ -16,6 +16,7 @@ type Project struct {
 	PivotReason      *string    `gorm:"type:text"`
 
 	ProjectOverview string `gorm:"type:text;not null;column:project_overview"`
+	ProjectKind     string `gorm:"type:text;column:project_kind"`
 	MVPScopeJSON    string `gorm:"type:jsonb;not null;column:mvp_scope"`
 	TechStackJSON   string `gorm:"type:jsonb;not null;column:tech_stack"`
 	RawAIOutput     string `gorm:"type:jsonb;not null;column:raw_ai_output"`

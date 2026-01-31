@@ -270,6 +270,7 @@ func saveGeneratedProject(ctx context.Context, input model.ProjectInput, idea ai
 		Title:           strings.TrimSpace(idea.Project.Name),
 		Summary:         strings.TrimSpace(idea.Project.Description.Summary),
 		ProjectOverview: overview,
+		ProjectKind:     strings.TrimSpace(input.ProjectKind),
 		MVPScopeJSON:    string(mvpJSON),
 		TechStackJSON:   string(techJSON),
 		RawAIOutput:     rawJSON,

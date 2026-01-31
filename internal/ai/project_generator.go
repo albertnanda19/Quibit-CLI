@@ -31,6 +31,11 @@ func buildProjectProposalPrompt(in model.ProjectInput, pivot string) string {
 	if err != nil {
 		techStackJSON = []byte("[]")
 	}
+	projectKind := strings.TrimSpace(in.ProjectKind)
+	projectKindLine := ""
+	if projectKind != "" {
+		projectKindLine = "- project_kind: " + projectKind + "\n"
+	}
 
 	pivot = strings.TrimSpace(pivot)
 	pivotBlock := ""
@@ -42,6 +47,7 @@ func buildProjectProposalPrompt(in model.ProjectInput, pivot string) string {
 		"You MUST return exactly one JSON object and nothing else.\n\n" +
 		"User Input (use these as constraints):\n" +
 		"- app_type: " + in.AppType + "\n" +
+		projectKindLine +
 		"- complexity: " + in.Complexity + "\n" +
 		"- tech_stack: " + string(techStackJSON) + "\n" +
 		"- goal: " + in.Goal + "\n" +

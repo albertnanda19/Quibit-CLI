@@ -28,6 +28,26 @@ var ApplicationTypePrompt = SelectPrompt{
 	Default:     Option{Label: "Web Application", Value: "web"},
 }
 
+var ProjectKindPrompt = SelectPrompt{
+	Title:       "Project Category (Optional)",
+	Description: "Optional: pick a specific kind of software (or skip to keep results like before).",
+	Options: []Option{
+		{Label: "Skip (no preference)", Value: ""},
+		{Label: "LMS (Learning Management System)", Value: "lms"},
+		{Label: "ERP (Enterprise Resource Planning)", Value: "erp"},
+		{Label: "CRM (Customer Relationship Management)", Value: "crm"},
+		{Label: "SCM (Supply Chain Management)", Value: "scm"},
+		{Label: "E-commerce", Value: "ecommerce"},
+		{Label: "FinTech / Accounting", Value: "fintech"},
+		{Label: "Healthcare", Value: "healthcare"},
+		{Label: "Marketplace", Value: "marketplace"},
+		{Label: "Mobile-first version", Value: "mobile-first"},
+		{Label: "AI project / AI-powered app", Value: "ai-project"},
+	},
+	CustomLabel: "Custom",
+	Default:     Option{Label: "Skip (no preference)", Value: ""},
+}
+
 var ComplexityPrompt = SelectPrompt{
 	Title:       "Complexity Level",
 	Description: "Define the expected difficulty and depth of the project.",
