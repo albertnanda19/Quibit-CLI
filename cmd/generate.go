@@ -13,8 +13,8 @@ import (
 
 	"quibit/internal/ai"
 	"quibit/internal/db"
-	dbmodels "quibit/internal/db/models"
 	"quibit/internal/model"
+	pmodels "quibit/internal/persistence/models"
 	"quibit/internal/project"
 	"quibit/internal/tui"
 	tuiinput "quibit/internal/tui/input"
@@ -262,24 +262,32 @@ func saveGeneratedProject(ctx context.Context, input model.ProjectInput, idea ai
 		retryPtr = &v
 	}
 
-	row := dbmodels.Project{
-		ID:                uuid.New(),
-		ProjectOverview:   overview,
-		MVPScopeJSON:      string(mvpJSON),
-		TechStackJSON:     string(techJSON),
-		Complexity:        idea.Project.Complexity,
-		EstimatedDuration: idea.Project.Duration.Range,
-		DNAHash:           project.HashContent(overview, mvp, stack, idea.Project.Complexity, idea.Project.Duration.Range),
-		AIProvider:        providerUsed,
-		ProviderUsed:      providerUsed,
-		FallbackUsed:      meta.FallbackUsed,
-		ProviderError:     providerErrPtr,
-		LatencyMS:         meta.LatencyMS,
-		RetryReason:       retryPtr,
-		RawAIOutput:       rawJSON,
-		AppType:           input.AppType,
-		Goal:              input.Goal,
-		CreatedAt:         time.Now(),
+	row := pmodels.Project{
+		ID:              uuid.New(),
+		Title:           strings.TrimSpace(idea.Project.Name),
+		Summary:         strings.TrimSpace(idea.Project.Description.Summary),
+		ProjectOverview: overview,
+		MVPScopeJSON:    string(mvpJSON),
+		TechStackJSON:   string(techJSON),
+		RawAIOutput:     rawJSON,
+		AppType:         input.AppType,
+		Goal:            input.Goal,
+
+		Complexity: idea.Project.Complexity,
+		Duration:   idea.Project.Duration.Range,
+
+		DNAHash:         project.HashContent(overview, mvp, stack, idea.Project.Complexity, idea.Project.Duration.Range),
+		SimilarityScore: 0,
+		PivotReason:     retryPtr,
+
+		AIProvider:    providerUsed,
+		ProviderUsed:  providerUsed,
+		FallbackUsed:  meta.FallbackUsed,
+		ProviderError: providerErrPtr,
+		LatencyMS:     meta.LatencyMS,
+		RetryReason:   retryPtr,
+
+		CreatedAt: time.Now(),
 	}
 
 	if err := gdb.Create(&row).Error; err != nil {
@@ -306,7 +314,7 @@ func evaluateSimilarity(ctx context.Context, idea ai.ProjectIdea, input model.Pr
 	}()
 
 	limit := loadSimilarityLimit()
-	var rows []dbmodels.Project
+	var rows []pmodels.Project
 	if err := gdb.Order("created_at desc").Limit(limit).Find(&rows).Error; err != nil {
 		return project.SimilarityOK, 0, fmt.Errorf("generate: load recent projects: %w", err)
 	}
@@ -340,7 +348,7 @@ func evaluateSimilarity(ctx context.Context, idea ai.ProjectIdea, input model.Pr
 			MVPScope:          mvp,
 			TechStack:         stack,
 			Complexity:        row.Complexity,
-			EstimatedDuration: row.EstimatedDuration,
+			EstimatedDuration: row.Duration,
 			AppType:           row.AppType,
 			Goal:              row.Goal,
 		}
@@ -449,7 +457,7 @@ func runContinueExisting(ctx context.Context, _ *os.File, out io.Writer) error {
 	for _, p := range projects {
 		options = append(options, tui.Option{
 			ID:    p.ID.String(),
-			Label: fmt.Sprintf("%s (%s, %s)", p.ProjectOverview, p.Complexity, p.EstimatedDuration),
+			Label: fmt.Sprintf("%s (%s, %s)", p.ProjectOverview, p.Complexity, p.Duration),
 		})
 	}
 
@@ -458,7 +466,7 @@ func runContinueExisting(ctx context.Context, _ *os.File, out io.Writer) error {
 		return err
 	}
 
-	var selected *dbmodels.Project
+	var selected *pmodels.Project
 	for i := range projects {
 		if projects[i].ID.String() == selection.ID {
 			selected = &projects[i]
@@ -496,7 +504,7 @@ func runContinueExisting(ctx context.Context, _ *os.File, out io.Writer) error {
 	fmt.Fprintln(out, selected.Complexity)
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "Estimated Duration")
-	fmt.Fprintln(out, selected.EstimatedDuration)
+	fmt.Fprintln(out, selected.Duration)
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "App Type")
 	fmt.Fprintln(out, selected.AppType)
@@ -506,7 +514,7 @@ func runContinueExisting(ctx context.Context, _ *os.File, out io.Writer) error {
 	return runProjectEvolution(ctx, out, selected, mvp, stack)
 }
 
-func loadRecentProjects(ctx context.Context) ([]dbmodels.Project, error) {
+func loadRecentProjects(ctx context.Context) ([]pmodels.Project, error) {
 	gdb, err := db.Connect(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("continue: %w", err)
@@ -520,20 +528,20 @@ func loadRecentProjects(ctx context.Context) ([]dbmodels.Project, error) {
 	}()
 
 	limit := loadSimilarityLimit()
-	var rows []dbmodels.Project
+	var rows []pmodels.Project
 	if err := gdb.Order("created_at desc").Limit(limit).Find(&rows).Error; err != nil {
 		return nil, fmt.Errorf("continue: load projects: %w", err)
 	}
 	return rows, nil
 }
 
-func runProjectEvolution(ctx context.Context, out io.Writer, selected *dbmodels.Project, mvp []string, stack []string) error {
+func runProjectEvolution(ctx context.Context, out io.Writer, selected *pmodels.Project, mvp []string, stack []string) error {
 	input := ai.EvolutionInput{
 		ProjectOverview:   selected.ProjectOverview,
 		MVPScope:          mvp,
 		TechStack:         stack,
 		Complexity:        selected.Complexity,
-		EstimatedDuration: selected.EstimatedDuration,
+		EstimatedDuration: selected.Duration,
 		AppType:           selected.AppType,
 		Goal:              selected.Goal,
 	}

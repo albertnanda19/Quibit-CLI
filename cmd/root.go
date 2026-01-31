@@ -35,9 +35,6 @@ var rootCmd = &cobra.Command{
 				if err := persistence.AutoMigrate(ctx, gdb); err != nil {
 					return fmt.Errorf("migrate: %w", err)
 				}
-				if err := db.AutoMigrateLegacy(ctx, gdb); err != nil {
-					return fmt.Errorf("migrate: %w", err)
-				}
 				if err := sqlDB.Close(); err != nil {
 					return fmt.Errorf("migrate: close sql db: %w", err)
 				}
