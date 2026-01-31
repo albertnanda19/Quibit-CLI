@@ -32,6 +32,7 @@ var generateCmd = &cobra.Command{
 		options := []tui.Option{
 			{ID: "new", Label: "Generate New Project"},
 			{ID: "continue", Label: "Continue Existing Project"},
+			{ID: "view", Label: "View Saved Projects"},
 		}
 
 		selection, err := tui.SelectOption(os.Stdin, out, "Select mode:", options)
@@ -44,6 +45,8 @@ var generateCmd = &cobra.Command{
 			return runGenerateNew(ctx, os.Stdin, out)
 		case "continue":
 			return runContinueExisting(ctx, os.Stdin, out)
+		case "view":
+			return runViewSavedProjects(ctx, out)
 		default:
 			return fmt.Errorf("generate: invalid selection")
 		}
@@ -608,30 +611,12 @@ func runProjectEvolution(ctx context.Context, out io.Writer, selected *pmodels.P
 		fmt.Fprintln(out, "")
 		fmt.Fprintln(out, "Generating next evolution with AI")
 
-		evo, _, err := ai.GenerateProjectEvolution(ctx, input)
+		evo, rawJSON, meta, err := ai.GenerateProjectEvolutionWithMeta(ctx, input)
 		if err != nil {
 			return fmt.Errorf("continue: %w", err)
 		}
 
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Next Project Evolution")
-		fmt.Fprintln(out, evo.EvolutionOverview)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Product Rationale")
-		fmt.Fprintln(out, evo.ProductRationale)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Technical Rationale")
-		fmt.Fprintln(out, evo.TechnicalRationale)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Proposed Enhancements")
-		for _, item := range evo.ProposedEnhancements {
-			fmt.Fprintf(out, "- %s\n", item)
-		}
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Risk Considerations")
-		for _, item := range evo.RiskConsiderations {
-			fmt.Fprintf(out, "- %s\n", item)
-		}
+		printEvolution(out, evo)
 
 		selection, err := tui.SelectOption(os.Stdin, out, "Next action:", []tui.Option{
 			{ID: "accept", Label: "Accept"},
@@ -644,6 +629,9 @@ func runProjectEvolution(ctx context.Context, out io.Writer, selected *pmodels.P
 
 		switch selection.ID {
 		case "accept":
+			if err := saveProjectEvolution(ctx, selected.ID, rawJSON, meta); err != nil {
+				return err
+			}
 			return nil
 		case "regenerate":
 			continue
@@ -652,5 +640,239 @@ func runProjectEvolution(ctx context.Context, out io.Writer, selected *pmodels.P
 		default:
 			return fmt.Errorf("continue: invalid selection")
 		}
+	}
+}
+
+func saveProjectEvolution(ctx context.Context, projectID uuid.UUID, rawJSON string, meta ai.AIResult) error {
+	gdb, err := db.Connect(ctx)
+	if err != nil {
+		return fmt.Errorf("continue: %w", err)
+	}
+	sqlDB, err := gdb.DB()
+	if err != nil {
+		return fmt.Errorf("continue: get sql db: %w", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+
+	providerUsed := strings.TrimSpace(meta.ProviderUsed)
+	if providerUsed == "" {
+		providerUsed = "gemini"
+	}
+	var providerErrPtr *string
+	if strings.TrimSpace(meta.ProviderError) != "" {
+		v := meta.ProviderError
+		providerErrPtr = &v
+	}
+
+	row := pmodels.ProjectEvolution{
+		ID:            uuid.New(),
+		ProjectID:     projectID,
+		RawAIOutput:   rawJSON,
+		ProviderUsed:  providerUsed,
+		FallbackUsed:  meta.FallbackUsed,
+		ProviderError: providerErrPtr,
+		LatencyMS:     meta.LatencyMS,
+		CreatedAt:     time.Now(),
+	}
+	if err := gdb.Create(&row).Error; err != nil {
+		return fmt.Errorf("continue: save evolution: %w", err)
+	}
+	return nil
+}
+
+func runViewSavedProjects(ctx context.Context, out io.Writer) error {
+	projects, err := loadRecentProjects(ctx)
+	if err != nil {
+		return err
+	}
+	if len(projects) == 0 {
+		fmt.Fprintln(out, "No existing projects found.")
+		return nil
+	}
+
+	options := make([]tui.Option, 0, len(projects))
+	for _, p := range projects {
+		options = append(options, tui.Option{
+			ID:    p.ID.String(),
+			Label: fmt.Sprintf("%s (%s, %s)", p.ProjectOverview, p.Complexity, p.Duration),
+		})
+	}
+
+	selection, err := tui.SelectOption(os.Stdin, out, "Select a project:", options)
+	if err != nil {
+		return err
+	}
+
+	var selected *pmodels.Project
+	for i := range projects {
+		if projects[i].ID.String() == selection.ID {
+			selected = &projects[i]
+			break
+		}
+	}
+	if selected == nil {
+		return fmt.Errorf("view: invalid selection")
+	}
+
+	var idea ai.ProjectIdea
+	if err := json.Unmarshal([]byte(selected.RawAIOutput), &idea); err != nil {
+		return fmt.Errorf("view: parse saved raw_ai_output: %w", err)
+	}
+
+	printIdea(out, idea)
+
+	evolutions, err := loadProjectEvolutions(ctx, selected.ID)
+	if err != nil {
+		return err
+	}
+	if len(evolutions) == 0 {
+		return nil
+	}
+
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Saved Evolutions")
+	for i := range evolutions {
+		var evo ai.ProjectEvolution
+		if err := json.Unmarshal([]byte(evolutions[i].RawAIOutput), &evo); err != nil {
+			return fmt.Errorf("view: parse saved evolution: %w", err)
+		}
+		fmt.Fprintln(out, "")
+		fmt.Fprintf(out, "Evolution #%d\n", i+1)
+		printEvolution(out, evo)
+	}
+
+	return nil
+}
+
+func loadProjectEvolutions(ctx context.Context, projectID uuid.UUID) ([]pmodels.ProjectEvolution, error) {
+	gdb, err := db.Connect(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("view: %w", err)
+	}
+	sqlDB, err := gdb.DB()
+	if err != nil {
+		return nil, fmt.Errorf("view: get sql db: %w", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+
+	var rows []pmodels.ProjectEvolution
+	if err := gdb.Where("project_id = ?", projectID).Order("created_at asc").Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("view: load evolutions: %w", err)
+	}
+	return rows, nil
+}
+
+func printIdea(out io.Writer, idea ai.ProjectIdea) {
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Project")
+	fmt.Fprintf(out, "%s — %s\n", idea.Project.Name, idea.Project.Tagline)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Summary")
+	fmt.Fprintln(out, idea.Project.Description.Summary)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Detailed Explanation")
+	fmt.Fprintln(out, idea.Project.Description.DetailedExplanation)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Problem Statement")
+	fmt.Fprintln(out, idea.Project.Problem.Problem)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Why It Matters")
+	fmt.Fprintln(out, idea.Project.Problem.WhyItMatters)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Current Solutions and Gaps")
+	fmt.Fprintln(out, idea.Project.Problem.CurrentSolutionsAndGaps)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Target Users (Primary)")
+	for _, item := range idea.Project.TargetUsers.Primary {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Target Users (Secondary)")
+	for _, item := range idea.Project.TargetUsers.Secondary {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Use Cases")
+	for _, item := range idea.Project.TargetUsers.UseCases {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Value Proposition")
+	for _, item := range idea.Project.ValueProp.KeyBenefits {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Why This Project Is Interesting")
+	fmt.Fprintln(out, idea.Project.ValueProp.WhyThisProjectIsInteresting)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Portfolio Value")
+	fmt.Fprintln(out, idea.Project.ValueProp.PortfolioValue)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "MVP Goal")
+	fmt.Fprintln(out, idea.Project.MVP.Goal)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "MVP Must-Have Features")
+	for _, item := range idea.Project.MVP.MustHave {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "MVP Nice-to-Have Features")
+	for _, item := range idea.Project.MVP.NiceToHave {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Out of Scope")
+	for _, item := range idea.Project.MVP.OutOfScope {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Recommended Tech Stack")
+	fmt.Fprintf(out, "- Backend: %s\n", idea.Project.TechStack.Backend)
+	fmt.Fprintf(out, "- Frontend: %s\n", idea.Project.TechStack.Frontend)
+	fmt.Fprintf(out, "- Database: %s\n", idea.Project.TechStack.Database)
+	fmt.Fprintf(out, "- Infra: %s\n", idea.Project.TechStack.Infra)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Tech Stack Justification")
+	fmt.Fprintln(out, idea.Project.TechStack.Justification)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Complexity")
+	fmt.Fprintln(out, idea.Project.Complexity)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Estimated Duration")
+	fmt.Fprintln(out, idea.Project.Duration.Range)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Duration Assumptions")
+	fmt.Fprintln(out, idea.Project.Duration.Assumptions)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Future Extensions")
+	for _, item := range idea.Project.Future {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Learning Outcomes")
+	for _, item := range idea.Project.Learning {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+}
+
+func printEvolution(out io.Writer, evo ai.ProjectEvolution) {
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Next Project Evolution")
+	fmt.Fprintln(out, evo.EvolutionOverview)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Product Rationale")
+	fmt.Fprintln(out, evo.ProductRationale)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Technical Rationale")
+	fmt.Fprintln(out, evo.TechnicalRationale)
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Proposed Enhancements")
+	for _, item := range evo.ProposedEnhancements {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Risk Considerations")
+	for _, item := range evo.RiskConsiderations {
+		fmt.Fprintf(out, "- %s\n", item)
 	}
 }

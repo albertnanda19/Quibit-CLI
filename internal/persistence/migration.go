@@ -18,6 +18,7 @@ func AutoMigrate(ctx context.Context, db *gorm.DB) error {
 		&models.Project{},
 		&models.ProjectFeature{},
 		&models.ProjectMeta{},
+		&models.ProjectEvolution{},
 	); err != nil {
 		return fmt.Errorf("auto-migrate: %w", err)
 	}
