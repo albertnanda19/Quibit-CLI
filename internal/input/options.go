@@ -25,6 +25,26 @@ var ApplicationTypePrompt = SelectPrompt{
 	Default:     SelectOption{Label: "Web Application", Value: "web"},
 }
 
+var ProjectKindPrompt = SelectPrompt{
+	Title:       "Project Category (Optional)",
+	Description: "Optional: choose a kind of software (or skip to keep results like before).",
+	Options: []SelectOption{
+		{Label: "Skip (no preference)", Value: ""},
+		{Label: "LMS (Learning Management System)", Value: "lms"},
+		{Label: "ERP (Enterprise Resource Planning)", Value: "erp"},
+		{Label: "CRM (Customer Relationship Management)", Value: "crm"},
+		{Label: "SCM (Supply Chain Management)", Value: "scm"},
+		{Label: "E-commerce", Value: "ecommerce"},
+		{Label: "FinTech / Accounting", Value: "fintech"},
+		{Label: "Healthcare", Value: "healthcare"},
+		{Label: "Marketplace", Value: "marketplace"},
+		{Label: "Mobile-first version", Value: "mobile-first"},
+		{Label: "AI project / AI-powered app", Value: "ai-project"},
+	},
+	CustomLabel: "Custom",
+	Default:     SelectOption{Label: "Skip (no preference)", Value: ""},
+}
+
 var ComplexityPrompt = SelectPrompt{
 	Title:       "Complexity Level",
 	Description: "Define the expected difficulty and depth of the project.",
@@ -42,12 +62,34 @@ var TechnologyStackPrompt = SelectPrompt{
 	Description: "Select or customize the primary technologies.",
 	Options: []SelectOption{
 		{Label: "Go", Value: "go"},
+		{Label: "React", Value: "react"},
+		{Label: "Vue", Value: "vue"},
+		{Label: "Astro", Value: "astro"},
+		{Label: "Laravel", Value: "laravel"},
+		{Label: "Spring Boot", Value: "spring-boot"},
 		{Label: "Node.js", Value: "nodejs"},
 		{Label: "Python", Value: "python"},
 		{Label: "Rust", Value: "rust"},
+		{Label: "Java", Value: "java"},
+		{Label: "TypeScript", Value: "typescript"},
 	},
 	CustomLabel: "Custom (comma separated)",
 	Default:     SelectOption{Label: "Go", Value: "go"},
+}
+
+var DatabasePrompt = SelectPrompt{
+	Title:       "Database",
+	Description: "Select a database preference (or choose no database).",
+	Options: []SelectOption{
+		{Label: "No database", Value: "none"},
+		{Label: "PostgreSQL", Value: "postgresql"},
+		{Label: "MySQL", Value: "mysql"},
+		{Label: "SQLite", Value: "sqlite"},
+		{Label: "MongoDB", Value: "mongodb"},
+		{Label: "Redis", Value: "redis"},
+	},
+	CustomLabel: "Custom",
+	Default:     SelectOption{Label: "No database", Value: "none"},
 }
 
 var ProjectGoalPrompt = SelectPrompt{

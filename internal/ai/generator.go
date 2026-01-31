@@ -32,7 +32,7 @@ func equalStringSlice(a, b []string) bool {
 		return false
 	}
 	for i := range a {
-		if a[i] != b[i] {
+		if normalizeToken(a[i]) != normalizeToken(b[i]) {
 			return false
 		}
 	}

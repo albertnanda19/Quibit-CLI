@@ -113,12 +113,21 @@ func BuildProjectIdeaPrompt(in model.ProjectInput) string {
 	if projectKind != "" {
 		projectKindLine = "- project_kind: " + projectKind + "\n"
 	}
+	dbPref := strings.TrimSpace(in.Database)
+	dbLine := ""
+	if dbPref != "" && strings.ToLower(dbPref) != "none" {
+		dbLine = "- database_preference: " + dbPref + "\n"
+	}
+	if strings.ToLower(dbPref) == "none" {
+		dbLine = "- database_preference: none\n"
+	}
 
 	return "Return ONLY valid JSON. Do not include explanation, formatting, markdown, or extra text.\n" +
 		"You MUST return exactly one JSON object and nothing else.\n\n" +
 		"User Input (use these as constraints):\n" +
 		"- app_type: " + in.AppType + "\n" +
 		projectKindLine +
+		dbLine +
 		"- complexity: " + in.Complexity + "\n" +
 		"- tech_stack: " + string(techStackJSON) + "\n" +
 		"- goal: " + in.Goal + "\n" +

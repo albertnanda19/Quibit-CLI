@@ -132,6 +132,13 @@ func CollectProjectInput() (model.ProjectInput, error) {
 	fmt.Println("---")
 	fmt.Println("")
 
+	projectKind, err := promptSelectWithDefault(r, ProjectKindPrompt, nil)
+	if err != nil {
+		return model.ProjectInput{}, err
+	}
+	fmt.Println("---")
+	fmt.Println("")
+
 	complexity, err := promptSelectWithDefault(r, ComplexityPrompt, func(v string) error {
 		v = normalizeComplexity(v)
 		return validateComplexity(v)
@@ -151,6 +158,13 @@ func CollectProjectInput() (model.ProjectInput, error) {
 	fmt.Println("---")
 	fmt.Println("")
 
+	dbPref, err := promptSelectWithDefault(r, DatabasePrompt, nil)
+	if err != nil {
+		return model.ProjectInput{}, err
+	}
+	fmt.Println("---")
+	fmt.Println("")
+
 	goal, err := promptSelectWithDefault(r, ProjectGoalPrompt, nil)
 	if err != nil {
 		return model.ProjectInput{}, err
@@ -164,11 +178,13 @@ func CollectProjectInput() (model.ProjectInput, error) {
 	}
 
 	return model.ProjectInput{
-		AppType:    appType,
-		Complexity: complexity,
-		TechStack:  techStack,
-		Goal:       goal,
-		Timeframe:  timeframe,
+		AppType:     appType,
+		ProjectKind: projectKind,
+		Complexity:  complexity,
+		TechStack:   techStack,
+		Database:    dbPref,
+		Goal:        goal,
+		Timeframe:   timeframe,
 	}, nil
 }
 

@@ -39,6 +39,12 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 	techStack := parseList(techStackRaw)
 	printDivider(out)
 
+	database, err := promptSelectWithCustom(in, out, reader, DatabasePrompt)
+	if err != nil {
+		return model.ProjectInput{}, err
+	}
+	printDivider(out)
+
 	goal, err := promptSelectWithCustom(in, out, reader, ProjectGoalPrompt)
 	if err != nil {
 		return model.ProjectInput{}, err
@@ -55,6 +61,7 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 		ProjectKind: projectKind,
 		Complexity:  complexity,
 		TechStack:   techStack,
+		Database:    database,
 		Goal:        goal,
 		Timeframe:   timeframe,
 	}, nil

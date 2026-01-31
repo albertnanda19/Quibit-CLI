@@ -36,6 +36,14 @@ func buildProjectProposalPrompt(in model.ProjectInput, pivot string) string {
 	if projectKind != "" {
 		projectKindLine = "- project_kind: " + projectKind + "\n"
 	}
+	dbPref := strings.TrimSpace(in.Database)
+	dbLine := ""
+	if dbPref != "" && strings.ToLower(dbPref) != "none" {
+		dbLine = "- database_preference: " + dbPref + "\n"
+	}
+	if strings.ToLower(dbPref) == "none" {
+		dbLine = "- database_preference: none\n"
+	}
 
 	pivot = strings.TrimSpace(pivot)
 	pivotBlock := ""
@@ -48,6 +56,7 @@ func buildProjectProposalPrompt(in model.ProjectInput, pivot string) string {
 		"User Input (use these as constraints):\n" +
 		"- app_type: " + in.AppType + "\n" +
 		projectKindLine +
+		dbLine +
 		"- complexity: " + in.Complexity + "\n" +
 		"- tech_stack: " + string(techStackJSON) + "\n" +
 		"- goal: " + in.Goal + "\n" +

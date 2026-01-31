@@ -75,13 +75,24 @@ var TechnologyStackPrompt = SelectPrompt{
 		{Label: "Rust", Value: "rust"},
 		{Label: "Java", Value: "java"},
 		{Label: "TypeScript", Value: "typescript"},
-		{Label: "PostgreSQL", Value: "postgresql"},
-		{Label: "MySQL", Value: "mysql"},
-		{Label: "MongoDB", Value: "mongodb"},
-		{Label: "Docker", Value: "docker"},
 	},
 	CustomLabel: "Custom (comma separated)",
 	Default:     Option{Label: "Go", Value: "go"},
+}
+
+var DatabasePrompt = SelectPrompt{
+	Title:       "Database",
+	Description: "Select a database preference (or choose no database).",
+	Options: []Option{
+		{Label: "No database", Value: "none"},
+		{Label: "PostgreSQL", Value: "postgresql"},
+		{Label: "MySQL", Value: "mysql"},
+		{Label: "SQLite", Value: "sqlite"},
+		{Label: "MongoDB", Value: "mongodb"},
+		{Label: "Redis", Value: "redis"},
+	},
+	CustomLabel: "Custom",
+	Default:     Option{Label: "No database", Value: "none"},
 }
 
 var ProjectGoalPrompt = SelectPrompt{

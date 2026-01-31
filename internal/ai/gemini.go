@@ -280,16 +280,33 @@ func matchesInputTechStack(stack ProjectTechStack, input []string) bool {
 		stack.Infra,
 		stack.Justification,
 	}, " "))
+	joinedNorm := normalizeToken(joined)
 	for _, v := range input {
 		v = strings.TrimSpace(strings.ToLower(v))
 		if v == "" {
 			continue
 		}
-		if !strings.Contains(joined, v) {
+		if !strings.Contains(joinedNorm, normalizeToken(v)) {
 			return false
 		}
 	}
 	return true
+}
+
+func normalizeToken(s string) string {
+	// keep only [a-z0-9] to avoid false negatives like "nodejs" vs "node.js" or "spring-boot" vs "spring boot"
+	s = strings.ToLower(strings.TrimSpace(s))
+	if s == "" {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 func decodeProjectEvolution(raw string) (ProjectEvolution, error) {

@@ -5,6 +5,7 @@ type ProjectInput struct {
 	ProjectKind string
 	Complexity  string
 	TechStack   []string
+	Database    string
 	Goal        string
 	Timeframe   string
 }
