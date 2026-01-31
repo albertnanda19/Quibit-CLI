@@ -68,16 +68,16 @@ func promptSelectWithCustom(in *os.File, out io.Writer, reader *bufio.Reader, p 
 
 func buildOptions(p SelectPrompt) []tui.Option {
 	options := make([]tui.Option, 0, len(p.Options)+1)
+	options = append(options, tui.Option{
+		ID:    "custom",
+		Label: p.CustomLabel,
+	})
 	for _, opt := range p.Options {
 		options = append(options, tui.Option{
 			ID:    opt.Value,
 			Label: opt.Label,
 		})
 	}
-	options = append(options, tui.Option{
-		ID:    "custom",
-		Label: p.CustomLabel,
-	})
 	return options
 }
 

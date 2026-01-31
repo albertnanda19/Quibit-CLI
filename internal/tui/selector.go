@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"golang.org/x/sys/unix"
 )
@@ -129,12 +130,15 @@ func readByte(in *os.File) (byte, error) {
 }
 
 func renderOptions(out io.Writer, options []Option, selected int) {
+	width := terminalWidth(out)
 	for i := range options {
 		prefix := "  "
 		if i == selected {
 			prefix = "> "
 		}
-		fmt.Fprintf(out, "\r\033[K%s%s\n", prefix, options[i].Label)
+		label := sanitizeOneLine(options[i].Label)
+		label = truncateToWidth(label, width-len(prefix))
+		fmt.Fprintf(out, "\r\033[K%s%s\n", prefix, label)
 	}
 }
 
@@ -143,6 +147,46 @@ func moveCursorUp(out io.Writer, lines int) {
 		return
 	}
 	fmt.Fprintf(out, "\033[%dA", lines)
+}
+
+func terminalWidth(out io.Writer) int {
+	// Default to a safe width if we can't detect terminal size.
+	const fallback = 100
+
+	type fdWriter interface{ Fd() uintptr }
+	f, ok := out.(fdWriter)
+	if !ok {
+		return fallback
+	}
+	ws, err := unix.IoctlGetWinsize(int(f.Fd()), unix.TIOCGWINSZ)
+	if err != nil || ws == nil || ws.Col == 0 {
+		return fallback
+	}
+	return int(ws.Col)
+}
+
+func sanitizeOneLine(s string) string {
+	s = strings.ReplaceAll(s, "\r", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	return s
+}
+
+func truncateToWidth(s string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	// avoid weird tiny widths
+	if width < 10 {
+		width = 10
+	}
+	rs := []rune(s)
+	if len(rs) <= width {
+		return s
+	}
+	if width <= 3 {
+		return string(rs[:width])
+	}
+	return string(rs[:width-3]) + "..."
 }
 
 func isTerminal(fd int) bool {

@@ -61,7 +61,7 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 	var lastMeta ai.AIResult
 	for {
 		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Generating idea with Gemini...")
+		fmt.Fprintln(out, "Generating idea with AI")
 
 		var idea ai.ProjectIdea
 		var rawJSON string
@@ -548,7 +548,7 @@ func runProjectEvolution(ctx context.Context, out io.Writer, selected *pmodels.P
 
 	for {
 		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Generating next evolution with Gemini...")
+		fmt.Fprintln(out, "Generating next evolution with AI")
 
 		evo, _, err := ai.GenerateProjectEvolution(ctx, input)
 		if err != nil {
