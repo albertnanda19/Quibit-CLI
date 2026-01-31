@@ -46,3 +46,7 @@ func GetenvRequired(key string) (string, error) {
 	}
 	return v, nil
 }
+
+func GetenvOptional(key string) string {
+	return strings.TrimSpace(os.Getenv(key))
+}

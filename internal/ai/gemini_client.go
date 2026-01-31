@@ -3,19 +3,13 @@ package ai
 import (
 	"context"
 	"fmt"
-	"os"
+	"strings"
 
 	"google.golang.org/genai"
-
-	"quibit/internal/config"
 )
 
-func NewGeminiClient(ctx context.Context) (*genai.Client, error) {
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		_ = config.LoadDotEnv(".env")
-		apiKey = os.Getenv("GEMINI_API_KEY")
-	}
+func NewGeminiClient(ctx context.Context, apiKey string) (*genai.Client, error) {
+	apiKey = strings.TrimSpace(apiKey)
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY is required")
 	}
