@@ -117,14 +117,7 @@ func BuildProjectIdeaPrompt(in model.ProjectInput) string {
 	if projectKind == "" {
 		projectKindRule = "- If project_kind is not provided, you MUST infer a suitable software category based on tech_stack and typical real-world use.\n"
 	}
-	dbPref := strings.TrimSpace(in.Database)
-	dbLine := ""
-	if dbPref != "" && strings.ToLower(dbPref) != "none" {
-		dbLine = "- database_preference: " + dbPref + "\n"
-	}
-	if strings.ToLower(dbPref) == "none" {
-		dbLine = "- database_preference: none\n"
-	}
+	dbLine := databasePreferenceLine(in.Database)
 
 	return "Return ONLY valid JSON. Do not include explanation, formatting, markdown, or extra text.\n" +
 		"You MUST return exactly one JSON object and nothing else.\n\n" +

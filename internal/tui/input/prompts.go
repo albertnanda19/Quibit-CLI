@@ -140,8 +140,8 @@ var TechnologyStackPrompt = SelectPrompt{
 }
 
 var DatabasePrompt = SelectPrompt{
-	Title:       "Database",
-	Description: "Select a database preference (or choose no database).",
+	Title:       "Database(s)",
+	Description: "Select a database preference (or choose no database). Use Custom for multiple databases (comma separated).",
 	Options: []Option{
 		{Label: "No database", Value: "none"},
 		{Label: "PostgreSQL", Value: "postgresql"},
@@ -150,7 +150,7 @@ var DatabasePrompt = SelectPrompt{
 		{Label: "MongoDB", Value: "mongodb"},
 		{Label: "Redis", Value: "redis"},
 	},
-	CustomLabel: "Custom",
+	CustomLabel: "Custom (comma separated)",
 	Default:     Option{Label: "No database", Value: "none"},
 }
 

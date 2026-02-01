@@ -144,7 +144,7 @@ func CollectProjectInput() (model.ProjectInput, error) {
 	fmt.Println("")
 
 	var techStack []string
-	var dbPref string
+	var dbPref []string
 	if strings.TrimSpace(appType) == "web" {
 		arch, err := promptSelectWithDefault(r, WebArchitecturePrompt, nil)
 		if err != nil {
@@ -193,10 +193,11 @@ func CollectProjectInput() (model.ProjectInput, error) {
 		fmt.Println("")
 	}
 
-	dbPref, err = promptSelectWithDefault(r, DatabasePrompt, nil)
+	dbRaw, err := promptSelectWithDefault(r, DatabasePrompt, nil)
 	if err != nil {
 		return model.ProjectInput{}, err
 	}
+	dbPref = parseTechStack(dbRaw)
 	fmt.Println("---")
 	fmt.Println("")
 

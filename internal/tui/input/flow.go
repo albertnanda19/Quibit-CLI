@@ -22,7 +22,7 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 
 	// Web-specific sub-flow (must happen before Project Category, per UX requirement).
 	var techStack []string
-	var database string
+	var database []string
 	if strings.TrimSpace(appType) == "web" {
 		arch, err := promptSelectWithCustom(in, out, reader, WebArchitecturePrompt)
 		if err != nil {
@@ -39,10 +39,11 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 			techStack = []string{strings.TrimSpace(mvcFramework)}
 			printDivider(out)
 
-			database, err = promptSelectWithCustom(in, out, reader, DatabasePrompt)
+			dbRaw, err := promptSelectWithCustom(in, out, reader, DatabasePrompt)
 			if err != nil {
 				return model.ProjectInput{}, err
 			}
+			database = parseList(dbRaw)
 			printDivider(out)
 		case "split":
 			frontend, err := promptSelectWithCustom(in, out, reader, WebFrontendFrameworkPrompt)
@@ -57,10 +58,11 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 			}
 			printDivider(out)
 
-			database, err = promptSelectWithCustom(in, out, reader, DatabasePrompt)
+			dbRaw, err := promptSelectWithCustom(in, out, reader, DatabasePrompt)
 			if err != nil {
 				return model.ProjectInput{}, err
 			}
+			database = parseList(dbRaw)
 			printDivider(out)
 
 			techStack = []string{strings.TrimSpace(frontend), strings.TrimSpace(backend)}
@@ -78,10 +80,11 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 		techStack = parseList(techStackRaw)
 		printDivider(out)
 
-		database, err = promptSelectWithCustom(in, out, reader, DatabasePrompt)
+		dbRaw, err := promptSelectWithCustom(in, out, reader, DatabasePrompt)
 		if err != nil {
 			return model.ProjectInput{}, err
 		}
+		database = parseList(dbRaw)
 		printDivider(out)
 	}
 
