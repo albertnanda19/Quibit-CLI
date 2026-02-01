@@ -74,6 +74,8 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 	var pendingStrategy ai.PivotStrategy
 	var lastReasonUsed *ai.RetryReason
 	var lastMeta ai.AIResult
+	var diversityRef *project.Snapshot
+	diversityAttempts := 0
 generateLoop:
 	for {
 		fmt.Fprintln(out, "")
@@ -91,6 +93,23 @@ generateLoop:
 		}
 		if err != nil {
 			return fmt.Errorf("generate: %w", err)
+		}
+
+		// In-session diversity guard: when user regenerates (or generates again with same inputs),
+		// avoid returning an idea that's basically identical except the name.
+		if diversityRef != nil {
+			current := makeSnapshotFromIdea(idea, input)
+			score := project.JaccardSimilarity(current, *diversityRef)
+			decision := project.DecideSimilarity(score)
+			if decision != project.SimilarityOK && diversityAttempts < 3 {
+				diversityAttempts++
+				pendingReason = ptrRetry(ai.RetrySimilarityTooHigh)
+				pendingStrategy = rotatePivotStrategy(diversityAttempts)
+				continue
+			}
+			// stop enforcing once we got something distinct enough (or we hit attempt cap)
+			diversityRef = nil
+			diversityAttempts = 0
 		}
 
 		action, bestScore, err := evaluateSimilarity(ctx, idea, input)
@@ -246,18 +265,24 @@ generateLoop:
 					fmt.Fprintln(out, "Copied to clipboard.")
 				case "same":
 					// Keep the same input; just run generation again.
+					diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
+					diversityAttempts = 0
 					pendingReason = nil
 					lastReasonUsed = nil
 					continue generateLoop
 				case "same_harder":
 					// Keep the same input; increase complexity then generate again.
 					input.Complexity = bumpComplexity(input.Complexity)
+					diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
+					diversityAttempts = 0
 					pendingReason = nil
 					lastReasonUsed = nil
 					continue generateLoop
 				case "same_easier":
 					// Keep the same input; decrease complexity then generate again.
 					input.Complexity = lowerComplexity(input.Complexity)
+					diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
+					diversityAttempts = 0
 					pendingReason = nil
 					lastReasonUsed = nil
 					continue generateLoop
@@ -267,11 +292,15 @@ generateLoop:
 			}
 			return nil
 		case "regenerate":
+			diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
+			diversityAttempts = 0
 			pendingReason = ptrRetry(ai.RetryUserRejected)
 			pendingStrategy = selectPivotStrategy(ai.RetryUserRejected)
 			continue
 		case "regenerate_harder":
 			input.Complexity = bumpComplexity(input.Complexity)
+			diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
+			diversityAttempts = 0
 			pendingReason = ptrRetry(ai.RetryUserRejected)
 			pendingStrategy = selectPivotStrategy(ai.RetryUserRejected)
 			continue
@@ -578,6 +607,31 @@ func lowerComplexity(v string) string {
 		return strings.TrimSpace(v)
 	}
 }
+
+func rotatePivotStrategy(attempt int) ai.PivotStrategy {
+	switch attempt % 3 {
+	case 1:
+		return ai.PivotChangeTargetUser
+	case 2:
+		return ai.PivotContextShift
+	default:
+		return ai.PivotFeatureReplacement
+	}
+}
+
+func makeSnapshotFromIdea(idea ai.ProjectIdea, input model.ProjectInput) project.Snapshot {
+	return project.Snapshot{
+		Overview:          buildProjectOverview(idea),
+		MVPScope:          idea.Project.MVP.MustHave,
+		TechStack:         flattenTechStack(idea.Project.TechStack),
+		Complexity:        idea.Project.Complexity,
+		EstimatedDuration: idea.Project.Duration.Range,
+		AppType:           input.AppType,
+		Goal:              input.Goal,
+	}
+}
+
+func ptrSnapshot(s project.Snapshot) *project.Snapshot { return &s }
 
 func isUniqueViolation(err error) bool {
 	if err == nil {
