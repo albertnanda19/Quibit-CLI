@@ -227,6 +227,8 @@ generateLoop:
 				after, _ := tui.SelectOption(in, out, "Next action:", []tui.Option{
 					{ID: "copy", Label: "Copy output to clipboard"},
 					{ID: "same", Label: "Generate another project (same inputs)"},
+					{ID: "same_harder", Label: "Generate another project (higher complexity)"},
+					{ID: "same_easier", Label: "Generate another project (lower complexity)"},
 					{ID: "back", Label: "Back"},
 				})
 				switch after.ID {
@@ -244,6 +246,18 @@ generateLoop:
 					fmt.Fprintln(out, "Copied to clipboard.")
 				case "same":
 					// Keep the same input; just run generation again.
+					pendingReason = nil
+					lastReasonUsed = nil
+					continue generateLoop
+				case "same_harder":
+					// Keep the same input; increase complexity then generate again.
+					input.Complexity = bumpComplexity(input.Complexity)
+					pendingReason = nil
+					lastReasonUsed = nil
+					continue generateLoop
+				case "same_easier":
+					// Keep the same input; decrease complexity then generate again.
+					input.Complexity = lowerComplexity(input.Complexity)
 					pendingReason = nil
 					lastReasonUsed = nil
 					continue generateLoop
@@ -544,6 +558,21 @@ func bumpComplexity(v string) string {
 		return "advanced"
 	case "advanced":
 		return "advanced"
+	default:
+		// Preserve current behavior if user entered a custom complexity string.
+		return strings.TrimSpace(v)
+	}
+}
+
+func lowerComplexity(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	switch v {
+	case "advanced":
+		return "intermediate"
+	case "intermediate":
+		return "beginner"
+	case "beginner":
+		return "beginner"
 	default:
 		// Preserve current behavior if user entered a custom complexity string.
 		return strings.TrimSpace(v)
