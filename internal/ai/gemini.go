@@ -90,7 +90,7 @@ func GenerateProjectIdeaWithMeta(ctx context.Context, in model.ProjectInput) (Pr
 func GenerateProjectIdeaWithPivot(ctx context.Context, in model.ProjectInput, reason RetryReason, strategy PivotStrategy) (ProjectIdea, string, error) {
 	idea, raw, _, err := GenerateProjectIdeaWithPivotMeta(ctx, in, reason, strategy)
 	return idea, raw, err
-	}
+}
 
 func GenerateProjectIdeaWithPivotMeta(ctx context.Context, in model.ProjectInput, reason RetryReason, strategy PivotStrategy) (ProjectIdea, string, AIResult, error) {
 	m, err := newDefaultProviderManager()
@@ -103,7 +103,7 @@ func GenerateProjectIdeaWithPivotMeta(ctx context.Context, in model.ProjectInput
 func GenerateProjectEvolution(ctx context.Context, in EvolutionInput) (ProjectEvolution, string, error) {
 	evo, raw, _, err := GenerateProjectEvolutionWithMeta(ctx, in)
 	return evo, raw, err
-	}
+}
 
 func GenerateProjectEvolutionWithMeta(ctx context.Context, in EvolutionInput) (ProjectEvolution, string, AIResult, error) {
 	m, err := newDefaultProviderManager()
@@ -282,12 +282,21 @@ func matchesInputTechStack(stack ProjectTechStack, input []string) bool {
 	}, " "))
 	joinedNorm := normalizeToken(joined)
 	for _, v := range input {
-		v = strings.TrimSpace(strings.ToLower(v))
+		v = strings.TrimSpace(v)
 		if v == "" {
 			continue
 		}
-		if !strings.Contains(joinedNorm, normalizeToken(v)) {
+		required := requiredTechTokens(v)
+		if len(required) == 0 {
 			return false
+		}
+		for _, t := range required {
+			if t == "" {
+				continue
+			}
+			if !strings.Contains(joinedNorm, t) {
+				return false
+			}
 		}
 	}
 	return true
@@ -307,6 +316,65 @@ func normalizeToken(s string) string {
 		}
 	}
 	return b.String()
+}
+
+func requiredTechTokens(v string) []string {
+	// Split tech choices like "go-gin" / "nodejs-express" into required core tokens.
+	// Drop purely descriptive suffixes like "frontend/backend/api/mvc" so the model can express it naturally.
+	parts := splitAlphaNumTokens(v)
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = normalizeToken(p)
+		if p == "" {
+			continue
+		}
+		if isTechDescriptor(p) {
+			continue
+		}
+		out = append(out, p)
+	}
+
+	// If everything was descriptor-y (e.g. "frontend"), fall back to the full token.
+	if len(out) == 0 {
+		fallback := normalizeToken(v)
+		if fallback != "" && !isTechDescriptor(fallback) {
+			out = append(out, fallback)
+		}
+	}
+	return out
+}
+
+func splitAlphaNumTokens(s string) []string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	if s == "" {
+		return nil
+	}
+	var out []string
+	var cur strings.Builder
+	flush := func() {
+		if cur.Len() > 0 {
+			out = append(out, cur.String())
+			cur.Reset()
+		}
+	}
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			cur.WriteRune(r)
+			continue
+		}
+		flush()
+	}
+	flush()
+	return out
+}
+
+func isTechDescriptor(t string) bool {
+	switch t {
+	case "frontend", "backend", "api", "mvc", "fullstack", "monolith", "service":
+		return true
+	default:
+		return false
+	}
 }
 
 func decodeProjectEvolution(raw string) (ProjectEvolution, error) {

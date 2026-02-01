@@ -28,6 +28,65 @@ var ApplicationTypePrompt = SelectPrompt{
 	Default:     Option{Label: "Web Application", Value: "web"},
 }
 
+var WebArchitecturePrompt = SelectPrompt{
+	Title:       "Web Architecture",
+	Description: "Choose how you want to structure the web application.",
+	Options: []Option{
+		{Label: "MVC (monolith)", Value: "mvc"},
+		{Label: "Frontend + Backend (separate)", Value: "split"},
+	},
+	CustomLabel: "Custom",
+	Default:     Option{Label: "Frontend + Backend (separate)", Value: "split"},
+}
+
+var WebMVCFrameworkPrompt = SelectPrompt{
+	Title:       "MVC Framework",
+	Description: "Pick a framework for an MVC-style web application.",
+	Options: []Option{
+		{Label: "Laravel", Value: "laravel"},
+		{Label: "Next.js (fullstack)", Value: "nextjs"},
+		{Label: "Django", Value: "django"},
+		{Label: "Ruby on Rails", Value: "rails"},
+		{Label: "Spring Boot (MVC)", Value: "spring-boot-mvc"},
+		{Label: "ASP.NET Core MVC", Value: "aspnet-mvc"},
+	},
+	CustomLabel: "Custom",
+	Default:     Option{Label: "Laravel", Value: "laravel"},
+}
+
+var WebFrontendFrameworkPrompt = SelectPrompt{
+	Title:       "Frontend Framework",
+	Description: "Pick a frontend framework (Custom is available).",
+	Options: []Option{
+		{Label: "React", Value: "react"},
+		{Label: "Vue", Value: "vue"},
+		{Label: "Next.js (frontend)", Value: "nextjs-frontend"},
+		{Label: "Nuxt", Value: "nuxt"},
+		{Label: "SvelteKit", Value: "sveltekit"},
+		{Label: "Angular", Value: "angular"},
+		{Label: "Astro", Value: "astro"},
+	},
+	CustomLabel: "Custom",
+	Default:     Option{Label: "React", Value: "react"},
+}
+
+var WebBackendFrameworkPrompt = SelectPrompt{
+	Title:       "Backend Framework",
+	Description: "Pick a backend framework (Custom is available).",
+	Options: []Option{
+		{Label: "Go (Gin)", Value: "go-gin"},
+		{Label: "Go (Fiber)", Value: "go-fiber"},
+		{Label: "Node.js (Express)", Value: "nodejs-express"},
+		{Label: "Node.js (NestJS)", Value: "nodejs-nestjs"},
+		{Label: "Spring Boot", Value: "spring-boot"},
+		{Label: "Laravel (API)", Value: "laravel-api"},
+		{Label: "Django REST Framework", Value: "django-rest"},
+		{Label: "FastAPI", Value: "fastapi"},
+	},
+	CustomLabel: "Custom",
+	Default:     Option{Label: "Go (Gin)", Value: "go-gin"},
+}
+
 var ProjectKindPrompt = SelectPrompt{
 	Title:       "Project Category (Optional)",
 	Description: "Optional: pick a specific kind of software (or skip to keep results like before).",

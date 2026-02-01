@@ -132,13 +132,6 @@ func CollectProjectInput() (model.ProjectInput, error) {
 	fmt.Println("---")
 	fmt.Println("")
 
-	projectKind, err := promptSelectWithDefault(r, ProjectKindPrompt, nil)
-	if err != nil {
-		return model.ProjectInput{}, err
-	}
-	fmt.Println("---")
-	fmt.Println("")
-
 	complexity, err := promptSelectWithDefault(r, ComplexityPrompt, func(v string) error {
 		v = normalizeComplexity(v)
 		return validateComplexity(v)
@@ -150,15 +143,64 @@ func CollectProjectInput() (model.ProjectInput, error) {
 	fmt.Println("---")
 	fmt.Println("")
 
-	techStackRaw, err := promptSelectWithDefault(r, TechnologyStackPrompt, nil)
+	var techStack []string
+	var dbPref string
+	if strings.TrimSpace(appType) == "web" {
+		arch, err := promptSelectWithDefault(r, WebArchitecturePrompt, nil)
+		if err != nil {
+			return model.ProjectInput{}, err
+		}
+		fmt.Println("---")
+		fmt.Println("")
+
+		switch strings.TrimSpace(strings.ToLower(arch)) {
+		case "mvc":
+			mvcFramework, err := promptSelectWithDefault(r, WebMVCFrameworkPrompt, nil)
+			if err != nil {
+				return model.ProjectInput{}, err
+			}
+			techStack = []string{strings.TrimSpace(mvcFramework)}
+			fmt.Println("---")
+			fmt.Println("")
+		case "split":
+			frontend, err := promptSelectWithDefault(r, WebFrontendFrameworkPrompt, nil)
+			if err != nil {
+				return model.ProjectInput{}, err
+			}
+			fmt.Println("---")
+			fmt.Println("")
+
+			backend, err := promptSelectWithDefault(r, WebBackendFrameworkPrompt, nil)
+			if err != nil {
+				return model.ProjectInput{}, err
+			}
+			fmt.Println("---")
+			fmt.Println("")
+
+			techStack = []string{strings.TrimSpace(frontend), strings.TrimSpace(backend)}
+		default:
+			// unknown custom arch: fallback to generic prompt
+		}
+	}
+
+	if len(techStack) == 0 {
+		techStackRaw, err := promptSelectWithDefault(r, TechnologyStackPrompt, nil)
+		if err != nil {
+			return model.ProjectInput{}, err
+		}
+		techStack = parseTechStack(techStackRaw)
+		fmt.Println("---")
+		fmt.Println("")
+	}
+
+	dbPref, err = promptSelectWithDefault(r, DatabasePrompt, nil)
 	if err != nil {
 		return model.ProjectInput{}, err
 	}
-	techStack := parseTechStack(techStackRaw)
 	fmt.Println("---")
 	fmt.Println("")
 
-	dbPref, err := promptSelectWithDefault(r, DatabasePrompt, nil)
+	projectKind, err := promptSelectWithDefault(r, ProjectKindPrompt, nil)
 	if err != nil {
 		return model.ProjectInput{}, err
 	}

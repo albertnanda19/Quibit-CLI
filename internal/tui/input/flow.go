@@ -20,6 +20,72 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 	}
 	printDivider(out)
 
+	// Web-specific sub-flow (must happen before Project Category, per UX requirement).
+	var techStack []string
+	var database string
+	if strings.TrimSpace(appType) == "web" {
+		arch, err := promptSelectWithCustom(in, out, reader, WebArchitecturePrompt)
+		if err != nil {
+			return model.ProjectInput{}, err
+		}
+		printDivider(out)
+
+		switch strings.TrimSpace(strings.ToLower(arch)) {
+		case "mvc":
+			mvcFramework, err := promptSelectWithCustom(in, out, reader, WebMVCFrameworkPrompt)
+			if err != nil {
+				return model.ProjectInput{}, err
+			}
+			techStack = []string{strings.TrimSpace(mvcFramework)}
+			printDivider(out)
+
+			database, err = promptSelectWithCustom(in, out, reader, DatabasePrompt)
+			if err != nil {
+				return model.ProjectInput{}, err
+			}
+			printDivider(out)
+		case "split":
+			frontend, err := promptSelectWithCustom(in, out, reader, WebFrontendFrameworkPrompt)
+			if err != nil {
+				return model.ProjectInput{}, err
+			}
+			printDivider(out)
+
+			backend, err := promptSelectWithCustom(in, out, reader, WebBackendFrameworkPrompt)
+			if err != nil {
+				return model.ProjectInput{}, err
+			}
+			printDivider(out)
+
+			database, err = promptSelectWithCustom(in, out, reader, DatabasePrompt)
+			if err != nil {
+				return model.ProjectInput{}, err
+			}
+			printDivider(out)
+
+			techStack = []string{strings.TrimSpace(frontend), strings.TrimSpace(backend)}
+		default:
+			// Unknown custom architecture: fall back to existing generic tech stack prompts.
+		}
+	}
+
+	// Non-web (or unknown custom architecture) path uses generic tech/db prompts.
+	if len(techStack) == 0 {
+		techStackRaw, err := promptSelectWithCustom(in, out, reader, TechnologyStackPrompt)
+		if err != nil {
+			return model.ProjectInput{}, err
+		}
+		techStack = parseList(techStackRaw)
+		printDivider(out)
+
+		database, err = promptSelectWithCustom(in, out, reader, DatabasePrompt)
+		if err != nil {
+			return model.ProjectInput{}, err
+		}
+		printDivider(out)
+	}
+
+	// Project Category comes after tech selection so AI can recommend based on chosen tech.
 	projectKind, err := promptSelectOptionalWithCustom(in, out, reader, ProjectKindPrompt)
 	if err != nil {
 		return model.ProjectInput{}, err
@@ -27,19 +93,6 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 	printDivider(out)
 
 	complexity, err := promptSelectWithCustom(in, out, reader, ComplexityPrompt)
-	if err != nil {
-		return model.ProjectInput{}, err
-	}
-	printDivider(out)
-
-	techStackRaw, err := promptSelectWithCustom(in, out, reader, TechnologyStackPrompt)
-	if err != nil {
-		return model.ProjectInput{}, err
-	}
-	techStack := parseList(techStackRaw)
-	printDivider(out)
-
-	database, err := promptSelectWithCustom(in, out, reader, DatabasePrompt)
 	if err != nil {
 		return model.ProjectInput{}, err
 	}
