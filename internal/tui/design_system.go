@@ -20,6 +20,9 @@ const (
 	ColorMuted       = "38;5;245"
 	ColorDivider     = "38;5;238"
 	ColorAccent      = "1;38;5;81"
+	// Group/category headers inside interactive selection lists.
+	// Bold + muted to be more prominent than items without stealing focus.
+	ColorGroupHeader = "1;38;5;245"
 	ColorStatus      = "38;5;111"
 	ColorSuccess     = "38;5;114"
 	ColorWarning     = "38;5;214"

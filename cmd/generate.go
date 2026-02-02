@@ -202,7 +202,6 @@ generateLoop:
 					return nil
 				}
 			}
-			return nil
 		case "regenerate":
 			diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
 			diversityAttempts = 0
@@ -749,15 +748,8 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 		return nil
 	}
 
-	options := make([]tui.Option, 0, len(projects))
-	for _, p := range projects {
-		options = append(options, tui.Option{
-			ID:    p.ID.String(),
-			Label: fmt.Sprintf("%s (%s, %s)", p.ProjectOverview, p.Complexity, p.Duration),
-		})
-	}
-
-	selection, err := tui.SelectOption(os.Stdin, out, "Select a project.", options)
+	entries := buildSavedProjectEntries(projects)
+	selection, err := tui.SelectEntries(os.Stdin, out, "Select a project.", entries)
 	if err != nil {
 		return err
 	}
@@ -835,7 +827,91 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 			return nil
 		}
 	}
-	return nil
+}
+
+func buildSavedProjectEntries(projects []pmodels.Project) []tui.SelectEntry {
+	type group struct {
+		Title string
+		Items []pmodels.Project
+	}
+	order := []string{
+		"Web Application",
+		"Mobile Application",
+		"CLI Tool",
+		"Backend / API Service",
+		"Library / SDK",
+		"Others",
+	}
+	groups := map[string]*group{}
+	for i := range order {
+		groups[order[i]] = &group{Title: order[i]}
+	}
+
+	for i := range projects {
+		title := savedProjectGroupTitle(projects[i].AppType)
+		groups[title].Items = append(groups[title].Items, projects[i])
+	}
+
+	// Header rows are non-selectable; only projects are selectable.
+	entries := make([]tui.SelectEntry, 0, len(projects)+len(order))
+	for _, title := range order {
+		g := groups[title]
+		if g == nil || len(g.Items) == 0 {
+			continue
+		}
+		entries = append(entries, tui.SelectEntry{
+			ID:         "header:" + strings.ToLower(strings.ReplaceAll(title, " ", "-")),
+			Label:      title,
+			Selectable: false,
+		})
+		for _, p := range g.Items {
+			label := fmt.Sprintf("%s (%s, %s)", p.ProjectOverview, p.Complexity, p.Duration)
+			entries = append(entries, tui.SelectEntry{
+				ID:         p.ID.String(),
+				Label:      "  ▸ " + label,
+				Selectable: true,
+			})
+		}
+	}
+	return entries
+}
+
+func savedProjectGroupTitle(appType string) string {
+	s := strings.ToLower(strings.TrimSpace(appType))
+	if s == "" {
+		return "Others"
+	}
+	s = strings.ReplaceAll(s, "_", "-")
+	s = strings.ReplaceAll(s, " ", "-")
+
+	switch s {
+	case "web":
+		return "Web Application"
+	case "mobile":
+		return "Mobile Application"
+	case "cli":
+		return "CLI Tool"
+	case "backend", "backend-api", "api", "service", "api-service":
+		return "Backend / API Service"
+	}
+
+	// Tolerate custom types (free text) without nested-if chaos.
+	if strings.Contains(s, "web") || strings.Contains(s, "frontend") || strings.Contains(s, "fullstack") {
+		return "Web Application"
+	}
+	if strings.Contains(s, "mobile") || strings.Contains(s, "android") || strings.Contains(s, "ios") {
+		return "Mobile Application"
+	}
+	if strings.Contains(s, "cli") || strings.Contains(s, "terminal") || strings.Contains(s, "command-line") {
+		return "CLI Tool"
+	}
+	if strings.Contains(s, "backend") || strings.Contains(s, "api") || strings.Contains(s, "microservice") || strings.Contains(s, "service") {
+		return "Backend / API Service"
+	}
+	if strings.Contains(s, "library") || strings.Contains(s, "sdk") || strings.Contains(s, "package") || strings.Contains(s, "framework") {
+		return "Library / SDK"
+	}
+	return "Others"
 }
 
 func loadProjectEvolutions(ctx context.Context, projectID uuid.UUID) ([]pmodels.ProjectEvolution, error) {

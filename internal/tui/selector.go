@@ -15,23 +15,49 @@ type Option struct {
 	Label string
 }
 
+type SelectEntry struct {
+	ID         string
+	Label      string
+	Selectable bool
+}
+
 func SelectOption(in *os.File, out io.Writer, prompt string, options []Option) (Option, error) {
 	return SelectOptionWithDefault(in, out, prompt, options, "")
 }
 
 func SelectOptionWithDefault(in *os.File, out io.Writer, prompt string, options []Option, defaultID string) (Option, error) {
-	if len(options) == 0 {
-		return Option{}, errors.New("no options available")
+	entries := make([]SelectEntry, 0, len(options))
+	for i := range options {
+		entries = append(entries, SelectEntry{
+			ID:         options[i].ID,
+			Label:      options[i].Label,
+			Selectable: true,
+		})
+	}
+	selection, err := SelectEntriesWithDefault(in, out, prompt, entries, defaultID)
+	if err != nil {
+		return Option{}, err
+	}
+	return Option{ID: selection.ID, Label: selection.Label}, nil
+}
+
+func SelectEntries(in *os.File, out io.Writer, prompt string, entries []SelectEntry) (SelectEntry, error) {
+	return SelectEntriesWithDefault(in, out, prompt, entries, "")
+}
+
+func SelectEntriesWithDefault(in *os.File, out io.Writer, prompt string, entries []SelectEntry, defaultID string) (SelectEntry, error) {
+	if len(entries) == 0 {
+		return SelectEntry{}, errors.New("no options available")
 	}
 
 	fd := int(in.Fd())
 	if !isTerminal(fd) {
-		return Option{}, errors.New("interactive selection requires a terminal (TTY)")
+		return SelectEntry{}, errors.New("interactive selection requires a terminal (TTY)")
 	}
 
 	restore, err := makeRaw(fd)
 	if err != nil {
-		return Option{}, fmt.Errorf("unable to enable interactive mode: %w", err)
+		return SelectEntry{}, fmt.Errorf("unable to enable interactive mode: %w", err)
 	}
 	defer restore()
 
@@ -41,46 +67,69 @@ func SelectOptionWithDefault(in *os.File, out io.Writer, prompt string, options 
 		Divider(out)
 		BlankLine(out)
 	}
-	selected := findDefaultIndex(options, defaultID)
-	renderOptions(out, options, selected)
+	selected := findDefaultSelectableIndex(entries, defaultID)
+	renderEntries(out, entries, selected)
 
 	for {
 		key, err := readKey(in)
 		if err != nil {
-			return Option{}, err
+			return SelectEntry{}, err
 		}
 
 		switch key {
 		case keyUp:
-			if selected > 0 {
-				selected--
-			}
+			selected = moveSelectable(entries, selected, -1)
 		case keyDown:
-			if selected < len(options)-1 {
-				selected++
-			}
+			selected = moveSelectable(entries, selected, +1)
 		case keyEnter:
-			fmt.Fprintln(out, "")
-			return options[selected], nil
+			if selected >= 0 && selected < len(entries) && entries[selected].Selectable {
+				fmt.Fprintln(out, "")
+				return entries[selected], nil
+			}
+			continue
 		default:
 			continue
 		}
 
-		moveCursorUp(out, len(options)+selectFooterLines)
-		renderOptions(out, options, selected)
+		moveCursorUp(out, len(entries)+selectFooterLines)
+		renderEntries(out, entries, selected)
 	}
 }
 
-func findDefaultIndex(options []Option, defaultID string) int {
-	if defaultID == "" {
-		return 0
+func findDefaultSelectableIndex(entries []SelectEntry, defaultID string) int {
+	if defaultID != "" {
+		for i := range entries {
+			if entries[i].Selectable && entries[i].ID == defaultID {
+				return i
+			}
+		}
 	}
-	for i := range options {
-		if options[i].ID == defaultID {
+	for i := range entries {
+		if entries[i].Selectable {
 			return i
 		}
 	}
 	return 0
+}
+
+func moveSelectable(entries []SelectEntry, selected int, dir int) int {
+	if len(entries) == 0 {
+		return 0
+	}
+	if dir == 0 {
+		return selected
+	}
+	next := selected
+	for {
+		candidate := next + dir
+		if candidate < 0 || candidate >= len(entries) {
+			return next
+		}
+		next = candidate
+		if entries[next].Selectable {
+			return next
+		}
+	}
 }
 
 const (
@@ -134,12 +183,16 @@ func readByte(in *os.File) (byte, error) {
 
 const selectFooterLines = 2
 
-func renderOptions(out io.Writer, options []Option, selected int) {
+func renderEntries(out io.Writer, entries []SelectEntry, selected int) {
 	width := terminalWidth(out)
 	width = clampWidth(width)
-	for i := range options {
-		label := sanitizeOneLine(options[i].Label)
+	for i := range entries {
+		label := sanitizeOneLine(entries[i].Label)
 		label = truncateToWidth(label, width-4)
+		if !entries[i].Selectable {
+			fmt.Fprintf(out, "\r\033[K%s\n", style(label, ColorGroupHeader))
+			continue
+		}
 		if i == selected {
 			prefix := style("› ", ColorAccent)
 			fmt.Fprintf(out, "\r\033[K%s%s\n", prefix, style(label, ColorPrimary))
