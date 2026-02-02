@@ -19,7 +19,13 @@ func promptString(r *bufio.Reader) (string, error) {
 }
 
 func promptWithDefault(r *bufio.Reader, label string, defaultValue string) (string, error) {
-	fmt.Printf("%s [%s]:\n> ", label, defaultValue)
+	fmt.Println("")
+	fmt.Println(label)
+	if strings.TrimSpace(defaultValue) != "" {
+		fmt.Printf("Default: %s\n", defaultValue)
+	}
+	fmt.Println("Input:")
+	fmt.Print("> ")
 	v, err := promptString(r)
 	if err != nil {
 		return "", err
@@ -34,10 +40,13 @@ func promptWithDefault(r *bufio.Reader, label string, defaultValue string) (stri
 type validatorFn func(string) error
 
 func renderSelectPrompt(p SelectPrompt) {
-	fmt.Println(p.Title)
-	fmt.Println(p.Description)
 	fmt.Println("")
-	fmt.Println("Pilihan:")
+	fmt.Println(p.Title)
+	if strings.TrimSpace(p.Description) != "" {
+		fmt.Println(p.Description)
+	}
+	fmt.Println("")
+	fmt.Println("Options:")
 	for i, opt := range p.Options {
 		fmt.Printf("%d) %s\n", i+1, opt.Label)
 	}
@@ -60,7 +69,7 @@ func parseSelectInput(line string, p SelectPrompt) (string, error) {
 			return "", nil
 		}
 		if n < 0 || n > len(p.Options) {
-			return "", fmt.Errorf("Error: invalid selection")
+			return "", fmt.Errorf("Invalid selection. Choose 1-%d, 0 for custom, or press Enter for default.", len(p.Options))
 		}
 		return p.Options[n-1].Value, nil
 	}
@@ -78,12 +87,12 @@ func promptSelectWithDefault(r *bufio.Reader, p SelectPrompt, validate validator
 
 		v, err := parseSelectInput(line, p)
 		if err != nil {
-			fmt.Printf("%s\n\n", err.Error())
+			fmt.Printf("Error: %s\n\n", strings.TrimSpace(err.Error()))
 			continue
 		}
 
 		if strings.TrimSpace(line) == "0" {
-			fmt.Print("\nCustom Input:\n> ")
+			fmt.Print("\nCustom input\nInput:\n> ")
 			custom, err := promptString(r)
 			if err != nil {
 				return "", err
@@ -98,7 +107,7 @@ func promptSelectWithDefault(r *bufio.Reader, p SelectPrompt, validate validator
 
 		if validate != nil {
 			if err := validate(v); err != nil {
-				fmt.Printf("%s\n\n", err.Error())
+				fmt.Printf("Error: %s\n\n", strings.TrimSpace(err.Error()))
 				continue
 			}
 		}
@@ -115,7 +124,7 @@ func promptWithValidation(r *bufio.Reader, label string, defaultValue string, va
 			return "", err
 		}
 		if err := validate(v); err != nil {
-			fmt.Printf("%s\n\n", err.Error())
+			fmt.Printf("Error: %s\n\n", strings.TrimSpace(err.Error()))
 			continue
 		}
 		return v, nil
@@ -129,8 +138,7 @@ func CollectProjectInput() (model.ProjectInput, error) {
 	if err != nil {
 		return model.ProjectInput{}, err
 	}
-	fmt.Println("---")
-	fmt.Println("")
+	fmt.Println(strings.Repeat("-", 42))
 
 	complexity, err := promptSelectWithDefault(r, ComplexityPrompt, func(v string) error {
 		v = normalizeComplexity(v)
@@ -140,8 +148,7 @@ func CollectProjectInput() (model.ProjectInput, error) {
 		return model.ProjectInput{}, err
 	}
 	complexity = normalizeComplexity(complexity)
-	fmt.Println("---")
-	fmt.Println("")
+	fmt.Println(strings.Repeat("-", 42))
 
 	var techStack []string
 	var dbPref []string
@@ -150,8 +157,7 @@ func CollectProjectInput() (model.ProjectInput, error) {
 		if err != nil {
 			return model.ProjectInput{}, err
 		}
-		fmt.Println("---")
-		fmt.Println("")
+		fmt.Println(strings.Repeat("-", 42))
 
 		switch strings.TrimSpace(strings.ToLower(arch)) {
 		case "mvc":
@@ -160,22 +166,19 @@ func CollectProjectInput() (model.ProjectInput, error) {
 				return model.ProjectInput{}, err
 			}
 			techStack = []string{strings.TrimSpace(mvcFramework)}
-			fmt.Println("---")
-			fmt.Println("")
+			fmt.Println(strings.Repeat("-", 42))
 		case "split":
 			frontend, err := promptSelectWithDefault(r, WebFrontendFrameworkPrompt, nil)
 			if err != nil {
 				return model.ProjectInput{}, err
 			}
-			fmt.Println("---")
-			fmt.Println("")
+			fmt.Println(strings.Repeat("-", 42))
 
 			backend, err := promptSelectWithDefault(r, WebBackendFrameworkPrompt, nil)
 			if err != nil {
 				return model.ProjectInput{}, err
 			}
-			fmt.Println("---")
-			fmt.Println("")
+			fmt.Println(strings.Repeat("-", 42))
 
 			techStack = []string{strings.TrimSpace(frontend), strings.TrimSpace(backend)}
 		default:
@@ -189,8 +192,7 @@ func CollectProjectInput() (model.ProjectInput, error) {
 			return model.ProjectInput{}, err
 		}
 		techStack = parseTechStack(techStackRaw)
-		fmt.Println("---")
-		fmt.Println("")
+		fmt.Println(strings.Repeat("-", 42))
 	}
 
 	dbRaw, err := promptSelectWithDefault(r, DatabasePrompt, nil)
@@ -198,22 +200,19 @@ func CollectProjectInput() (model.ProjectInput, error) {
 		return model.ProjectInput{}, err
 	}
 	dbPref = parseTechStack(dbRaw)
-	fmt.Println("---")
-	fmt.Println("")
+	fmt.Println(strings.Repeat("-", 42))
 
 	projectKind, err := promptSelectWithDefault(r, ProjectKindPrompt, nil)
 	if err != nil {
 		return model.ProjectInput{}, err
 	}
-	fmt.Println("---")
-	fmt.Println("")
+	fmt.Println(strings.Repeat("-", 42))
 
 	goal, err := promptSelectWithDefault(r, ProjectGoalPrompt, nil)
 	if err != nil {
 		return model.ProjectInput{}, err
 	}
-	fmt.Println("---")
-	fmt.Println("")
+	fmt.Println(strings.Repeat("-", 42))
 
 	timeframe, err := promptSelectWithDefault(r, EstimatedTimeframePrompt, nil)
 	if err != nil {

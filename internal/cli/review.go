@@ -87,15 +87,16 @@ func DisplayProject(out io.Writer, p domain.Project) {
 func PromptNextAction(in io.Reader, out io.Writer) (NextAction, error) {
 	r := bufio.NewReader(in)
 	for {
-		fmt.Fprintln(out, "Review Result")
-		fmt.Fprintln(out, "What would you like to do?")
 		fmt.Fprintln(out, "")
+		fmt.Fprintln(out, "Review Result")
+		fmt.Fprintln(out, "Choose what to do next.")
+		fmt.Fprintln(out, strings.Repeat("-", 42))
 		fmt.Fprintln(out, "1) Accept and save project")
 		fmt.Fprintln(out, "2) Regenerate with same inputs")
 		fmt.Fprintln(out, "3) Regenerate with modified inputs")
 		fmt.Fprintln(out, "4) Cancel")
 		fmt.Fprintln(out, "")
-		fmt.Fprint(out, "Select an option [1]: ")
+		fmt.Fprint(out, "Input [default: 1]: ")
 
 		line, err := r.ReadString('\n')
 		if err != nil {
@@ -116,7 +117,8 @@ func PromptNextAction(in io.Reader, out io.Writer) (NextAction, error) {
 		case "4":
 			return NextActionCancel, nil
 		default:
-			fmt.Fprintln(out, "Invalid option. Please select 1-4.")
+			fmt.Fprintln(out, "")
+			fmt.Fprintln(out, "Error: Invalid selection. Choose 1-4.")
 			fmt.Fprintln(out, "")
 		}
 	}

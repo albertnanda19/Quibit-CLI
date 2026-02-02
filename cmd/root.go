@@ -6,6 +6,7 @@ import (
 
 	"quibit/internal/db"
 	"quibit/internal/persistence"
+	"quibit/internal/tui"
 
 	"github.com/spf13/cobra"
 )
@@ -21,7 +22,7 @@ var rootCmd = &cobra.Command{
 		if migrate {
 			{
 				ctx := cmd.Context()
-				fmt.Fprintln(cmd.OutOrStdout(), "Running database migrations...")
+				tui.Status(cmd.OutOrStdout(), "Running database migrations")
 				gdb, err := db.Connect(ctx)
 				if err != nil {
 					return fmt.Errorf("migrate: %w", err)
@@ -38,7 +39,7 @@ var rootCmd = &cobra.Command{
 				if err := sqlDB.Close(); err != nil {
 					return fmt.Errorf("migrate: close sql db: %w", err)
 				}
-				fmt.Fprintln(cmd.OutOrStdout(), "Database migrations completed.")
+				tui.Done(cmd.OutOrStdout(), "Database migrations completed")
 			}
 
 			os.Exit(0)

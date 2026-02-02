@@ -22,7 +22,7 @@ func CopyToClipboard(out io.Writer, text string) error {
 	if err := copyWithOSC52(out, text); err == nil {
 		return nil
 	}
-	return fmt.Errorf("clipboard: no supported clipboard method found (try installing wl-copy/xclip/xsel)")
+	return fmt.Errorf("clipboard is unavailable (install wl-copy/xclip/xsel, or use a terminal that supports OSC52)")
 }
 
 func copyWithExternalTools(text string) error {
@@ -52,7 +52,7 @@ func copyWithExternalTools(text string) error {
 		return cmd.Run()
 	}
 
-	return fmt.Errorf("clipboard: no external clipboard tool found")
+	return fmt.Errorf("no external clipboard tool found")
 }
 
 func copyWithOSC52(out io.Writer, text string) error {
@@ -74,9 +74,9 @@ func copyWithOSC52(out io.Writer, text string) error {
 	const maxBytes = 100_000
 	b := []byte(text)
 	if len(b) > maxBytes {
-		return fmt.Errorf("clipboard: content too large")
+		return fmt.Errorf("content is too large to copy via terminal clipboard")
 	}
-	return fmt.Errorf("clipboard: no terminal available for osc52")
+	return fmt.Errorf("no compatible terminal available for OSC52 clipboard")
 }
 
 func isTerminalFD(fd int) bool {
@@ -86,7 +86,7 @@ func isTerminalFD(fd int) bool {
 
 func writeOSC52(f *os.File, text string) error {
 	if f == nil {
-		return fmt.Errorf("clipboard: tty is nil")
+		return fmt.Errorf("terminal is unavailable")
 	}
 	enc := base64.StdEncoding.EncodeToString([]byte(text))
 	// OSC52: ESC ] 52 ; c ; <base64> BEL

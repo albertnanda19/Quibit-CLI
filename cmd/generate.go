@@ -38,7 +38,7 @@ var generateCmd = &cobra.Command{
 				{ID: "exit", Label: "Exit"},
 			}
 
-			selection, err := tui.SelectOption(os.Stdin, out, "Select mode:", options)
+			selection, err := tui.SelectOption(os.Stdin, out, "Mode:", options)
 			if err != nil {
 				return fmt.Errorf("generate: %w", err)
 			}
@@ -78,8 +78,7 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 	diversityAttempts := 0
 generateLoop:
 	for {
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Generating idea with AI")
+		tui.Status(out, "Generating project idea")
 
 		var idea ai.ProjectIdea
 		var rawJSON string
@@ -118,106 +117,17 @@ generateLoop:
 		}
 		switch action {
 		case project.SimilarityRegenerate:
-			fmt.Fprintf(out, "\nSimilarity score %.2f detected. Regenerating...\n", bestScore)
+			tui.Status(out, fmt.Sprintf("Similarity score %.2f is high; regenerating", bestScore))
 			pendingReason = ptrRetry(ai.RetrySimilarityTooHigh)
 			pendingStrategy = selectPivotStrategy(ai.RetrySimilarityTooHigh)
 			continue
 		case project.SimilarityBlock:
-			fmt.Fprintf(out, "\nSimilarity score %.2f is too high. Generation blocked.\n", bestScore)
+			fmt.Fprintf(out, "\nStatus: Similarity score %.2f is too high. Generation stopped.\n", bestScore)
 			return nil
 		default:
 		}
 
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Project")
-		fmt.Fprintf(out, "%s — %s\n", idea.Project.Name, idea.Project.Tagline)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Summary")
-		fmt.Fprintln(out, idea.Project.Description.Summary)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Detailed Explanation")
-		fmt.Fprintln(out, idea.Project.Description.DetailedExplanation)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Problem Statement")
-		fmt.Fprintln(out, idea.Project.Problem.Problem)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Why It Matters")
-		fmt.Fprintln(out, idea.Project.Problem.WhyItMatters)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Current Solutions and Gaps")
-		fmt.Fprintln(out, idea.Project.Problem.CurrentSolutionsAndGaps)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Target Users (Primary)")
-		for _, item := range idea.Project.TargetUsers.Primary {
-			fmt.Fprintf(out, "- %s\n", item)
-		}
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Target Users (Secondary)")
-		for _, item := range idea.Project.TargetUsers.Secondary {
-			fmt.Fprintf(out, "- %s\n", item)
-		}
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Use Cases")
-		for _, item := range idea.Project.TargetUsers.UseCases {
-			fmt.Fprintf(out, "- %s\n", item)
-		}
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Value Proposition")
-		for _, item := range idea.Project.ValueProp.KeyBenefits {
-			fmt.Fprintf(out, "- %s\n", item)
-		}
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Why This Project Is Interesting")
-		fmt.Fprintln(out, idea.Project.ValueProp.WhyThisProjectIsInteresting)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Portfolio Value")
-		fmt.Fprintln(out, idea.Project.ValueProp.PortfolioValue)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "MVP Goal")
-		fmt.Fprintln(out, idea.Project.MVP.Goal)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "MVP Must-Have Features")
-		for _, item := range idea.Project.MVP.MustHave {
-			fmt.Fprintf(out, "- %s\n", item)
-		}
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "MVP Nice-to-Have Features")
-		for _, item := range idea.Project.MVP.NiceToHave {
-			fmt.Fprintf(out, "- %s\n", item)
-		}
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Out of Scope")
-		for _, item := range idea.Project.MVP.OutOfScope {
-			fmt.Fprintf(out, "- %s\n", item)
-		}
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Recommended Tech Stack")
-		fmt.Fprintf(out, "- Backend: %s\n", idea.Project.TechStack.Backend)
-		fmt.Fprintf(out, "- Frontend: %s\n", idea.Project.TechStack.Frontend)
-		fmt.Fprintf(out, "- Database: %s\n", idea.Project.TechStack.Database)
-		fmt.Fprintf(out, "- Infra: %s\n", idea.Project.TechStack.Infra)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Tech Stack Justification")
-		fmt.Fprintln(out, idea.Project.TechStack.Justification)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Complexity")
-		fmt.Fprintln(out, idea.Project.Complexity)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Estimated Duration")
-		fmt.Fprintln(out, idea.Project.Duration.Range)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Duration Assumptions")
-		fmt.Fprintln(out, idea.Project.Duration.Assumptions)
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Future Extensions")
-		for _, item := range idea.Project.Future {
-			fmt.Fprintf(out, "- %s\n", item)
-		}
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Learning Outcomes")
-		for _, item := range idea.Project.Learning {
-			fmt.Fprintf(out, "- %s\n", item)
-		}
+		printIdea(out, idea)
 
 		selection, err := tui.SelectOption(in, out, "Next action:", []tui.Option{
 			{ID: "accept", Label: "Accept"},
@@ -233,15 +143,15 @@ generateLoop:
 		case "accept":
 			if err := saveGeneratedProject(ctx, input, idea, rawJSON, lastMeta, lastReasonUsed); err != nil {
 				if errors.Is(err, errDuplicateDNA) {
-					fmt.Fprintln(out, "\nDuplicate DNA detected. Regenerating...")
+					tui.Status(out, "Duplicate result detected; regenerating")
 					pendingReason = ptrRetry(ai.RetryDuplicateDNA)
 					pendingStrategy = selectPivotStrategy(ai.RetryDuplicateDNA)
 					continue
 				}
 				return err
 			}
-			fmt.Fprintln(out, "")
-			fmt.Fprintln(out, "Project saved.")
+			tui.BlankLine(out)
+			tui.Done(out, "Project saved")
 			for {
 				after, _ := tui.SelectOption(in, out, "Next action:", []tui.Option{
 					{ID: "copy", Label: "Copy output to clipboard"},
@@ -259,10 +169,10 @@ generateLoop:
 					fmt.Fprintln(&buf, "Raw JSON")
 					fmt.Fprintln(&buf, rawJSON)
 					if err := tui.CopyToClipboard(out, buf.String()); err != nil {
-						fmt.Fprintf(out, "Copy failed: %v\n", err)
+						tui.PrintError(out, "Unable to copy to clipboard", err)
 						continue
 					}
-					fmt.Fprintln(out, "Copied to clipboard.")
+					tui.Done(out, "Copied to clipboard")
 				case "same":
 					// Keep the same input; just run generation again.
 					diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
@@ -754,8 +664,7 @@ func runProjectEvolution(ctx context.Context, out io.Writer, selected *pmodels.P
 	}
 
 	for {
-		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "Generating next evolution with AI")
+		tui.Status(out, "Generating next evolution")
 
 		evo, rawJSON, meta, err := ai.GenerateProjectEvolutionWithMeta(ctx, input)
 		if err != nil {
@@ -832,7 +741,9 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 		return err
 	}
 	if len(projects) == 0 {
-		fmt.Fprintln(out, "No existing projects found.")
+		tui.BlankLine(out)
+		fmt.Fprintln(out, "No saved projects found.")
+		tui.Hint(out, "Generate a new project to create your first saved entry.")
 		return nil
 	}
 
@@ -872,8 +783,7 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Saved Evolutions")
+	tui.Heading(out, "Saved Evolutions")
 	for i := range evolutions {
 		var evo ai.ProjectEvolution
 		if err := json.Unmarshal([]byte(evolutions[i].RawAIOutput), &evo); err != nil {
@@ -915,10 +825,10 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 			fmt.Fprintln(&buf, "Project Raw JSON")
 			fmt.Fprintln(&buf, selected.RawAIOutput)
 			if err := tui.CopyToClipboard(out, buf.String()); err != nil {
-				fmt.Fprintf(out, "Copy failed: %v\n", err)
+				tui.PrintError(out, "Unable to copy to clipboard", err)
 				continue
 			}
-			fmt.Fprintln(out, "Copied to clipboard.")
+			tui.Done(out, "Copied to clipboard")
 		default:
 			return nil
 		}
@@ -945,115 +855,113 @@ func loadProjectEvolutions(ctx context.Context, projectID uuid.UUID) ([]pmodels.
 }
 
 func printIdea(out io.Writer, idea ai.ProjectIdea) {
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Project")
+	tui.Heading(out, "Project")
 	fmt.Fprintf(out, "%s — %s\n", idea.Project.Name, idea.Project.Tagline)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Summary")
+
+	tui.Heading(out, "Summary")
 	fmt.Fprintln(out, idea.Project.Description.Summary)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Detailed Explanation")
+
+	tui.Heading(out, "Detailed Explanation")
 	fmt.Fprintln(out, idea.Project.Description.DetailedExplanation)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Problem Statement")
+
+	tui.Heading(out, "Problem Statement")
 	fmt.Fprintln(out, idea.Project.Problem.Problem)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Why It Matters")
+
+	tui.Heading(out, "Why It Matters")
 	fmt.Fprintln(out, idea.Project.Problem.WhyItMatters)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Current Solutions and Gaps")
+
+	tui.Heading(out, "Current Solutions and Gaps")
 	fmt.Fprintln(out, idea.Project.Problem.CurrentSolutionsAndGaps)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Target Users (Primary)")
+
+	tui.Heading(out, "Target Users (Primary)")
 	for _, item := range idea.Project.TargetUsers.Primary {
 		fmt.Fprintf(out, "- %s\n", item)
 	}
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Target Users (Secondary)")
+
+	tui.Heading(out, "Target Users (Secondary)")
 	for _, item := range idea.Project.TargetUsers.Secondary {
 		fmt.Fprintf(out, "- %s\n", item)
 	}
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Use Cases")
+
+	tui.Heading(out, "Use Cases")
 	for _, item := range idea.Project.TargetUsers.UseCases {
 		fmt.Fprintf(out, "- %s\n", item)
 	}
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Value Proposition")
+
+	tui.Heading(out, "Value Proposition")
 	for _, item := range idea.Project.ValueProp.KeyBenefits {
 		fmt.Fprintf(out, "- %s\n", item)
 	}
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Why This Project Is Interesting")
+
+	tui.Heading(out, "Why This Project Is Interesting")
 	fmt.Fprintln(out, idea.Project.ValueProp.WhyThisProjectIsInteresting)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Portfolio Value")
+
+	tui.Heading(out, "Portfolio Value")
 	fmt.Fprintln(out, idea.Project.ValueProp.PortfolioValue)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "MVP Goal")
+
+	tui.Heading(out, "MVP Goal")
 	fmt.Fprintln(out, idea.Project.MVP.Goal)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "MVP Must-Have Features")
+
+	tui.Heading(out, "MVP Must-Have Features")
 	for _, item := range idea.Project.MVP.MustHave {
 		fmt.Fprintf(out, "- %s\n", item)
 	}
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "MVP Nice-to-Have Features")
+
+	tui.Heading(out, "MVP Nice-to-Have Features")
 	for _, item := range idea.Project.MVP.NiceToHave {
 		fmt.Fprintf(out, "- %s\n", item)
 	}
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Out of Scope")
+
+	tui.Heading(out, "Out of Scope")
 	for _, item := range idea.Project.MVP.OutOfScope {
 		fmt.Fprintf(out, "- %s\n", item)
 	}
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Recommended Tech Stack")
+
+	tui.Heading(out, "Recommended Tech Stack")
 	fmt.Fprintf(out, "- Backend: %s\n", idea.Project.TechStack.Backend)
 	fmt.Fprintf(out, "- Frontend: %s\n", idea.Project.TechStack.Frontend)
 	fmt.Fprintf(out, "- Database: %s\n", idea.Project.TechStack.Database)
 	fmt.Fprintf(out, "- Infra: %s\n", idea.Project.TechStack.Infra)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Tech Stack Justification")
+
+	tui.Heading(out, "Tech Stack Justification")
 	fmt.Fprintln(out, idea.Project.TechStack.Justification)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Complexity")
+
+	tui.Heading(out, "Complexity")
 	fmt.Fprintln(out, idea.Project.Complexity)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Estimated Duration")
+
+	tui.Heading(out, "Estimated Duration")
 	fmt.Fprintln(out, idea.Project.Duration.Range)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Duration Assumptions")
+
+	tui.Heading(out, "Duration Assumptions")
 	fmt.Fprintln(out, idea.Project.Duration.Assumptions)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Future Extensions")
+
+	tui.Heading(out, "Future Extensions")
 	for _, item := range idea.Project.Future {
 		fmt.Fprintf(out, "- %s\n", item)
 	}
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Learning Outcomes")
+
+	tui.Heading(out, "Learning Outcomes")
 	for _, item := range idea.Project.Learning {
 		fmt.Fprintf(out, "- %s\n", item)
 	}
 }
 
 func printEvolution(out io.Writer, evo ai.ProjectEvolution) {
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Next Project Evolution")
+	tui.Heading(out, "Next Project Evolution")
 	fmt.Fprintln(out, evo.EvolutionOverview)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Product Rationale")
+
+	tui.Heading(out, "Product Rationale")
 	fmt.Fprintln(out, evo.ProductRationale)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Technical Rationale")
+
+	tui.Heading(out, "Technical Rationale")
 	fmt.Fprintln(out, evo.TechnicalRationale)
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Proposed Enhancements")
+
+	tui.Heading(out, "Proposed Enhancements")
 	for _, item := range evo.ProposedEnhancements {
 		fmt.Fprintf(out, "- %s\n", item)
 	}
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "Risk Considerations")
+
+	tui.Heading(out, "Risk Considerations")
 	for _, item := range evo.RiskConsiderations {
 		fmt.Fprintf(out, "- %s\n", item)
 	}

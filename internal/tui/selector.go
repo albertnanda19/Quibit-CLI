@@ -21,22 +21,25 @@ func SelectOption(in *os.File, out io.Writer, prompt string, options []Option) (
 
 func SelectOptionWithDefault(in *os.File, out io.Writer, prompt string, options []Option, defaultID string) (Option, error) {
 	if len(options) == 0 {
-		return Option{}, errors.New("tui: empty options")
+		return Option{}, errors.New("no options available")
 	}
 
 	fd := int(in.Fd())
 	if !isTerminal(fd) {
-		return Option{}, errors.New("tui: input is not a terminal")
+		return Option{}, errors.New("interactive selection requires a terminal (TTY)")
 	}
 
 	restore, err := makeRaw(fd)
 	if err != nil {
-		return Option{}, fmt.Errorf("tui: raw mode: %w", err)
+		return Option{}, fmt.Errorf("unable to enable interactive mode: %w", err)
 	}
 	defer restore()
 
 	if prompt != "" {
+		BlankLine(out)
 		fmt.Fprintln(out, prompt)
+		ControlsSelect(out)
+		BlankLine(out)
 	}
 	selected := findDefaultIndex(options, defaultID)
 	renderOptions(out, options, selected)
@@ -124,7 +127,7 @@ func readByte(in *os.File) (byte, error) {
 	var buf [1]byte
 	_, err := in.Read(buf[:])
 	if err != nil {
-		return 0, fmt.Errorf("tui: read key: %w", err)
+		return 0, fmt.Errorf("read input: %w", err)
 	}
 	return buf[0], nil
 }

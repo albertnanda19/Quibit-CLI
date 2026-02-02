@@ -14,11 +14,17 @@ import (
 func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, error) {
 	reader := bufio.NewReader(in)
 
+	tui.Heading(out, "New Project Setup")
+	tui.Context(out, "Choose your preferences. Defaults are preselected; press Enter to accept.")
+	tui.BlankLine(out)
+	tui.ControlsSelect(out)
+	tui.Divider(out)
+
 	appType, err := promptSelectWithCustom(in, out, reader, ApplicationTypePrompt)
 	if err != nil {
 		return model.ProjectInput{}, err
 	}
-	printDivider(out)
+	tui.Divider(out)
 
 	// Web-specific sub-flow (must happen before Project Category, per UX requirement).
 	var techStack []string
@@ -28,7 +34,7 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 		if err != nil {
 			return model.ProjectInput{}, err
 		}
-		printDivider(out)
+		tui.Divider(out)
 
 		switch strings.TrimSpace(strings.ToLower(arch)) {
 		case "mvc":
@@ -37,37 +43,36 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 				return model.ProjectInput{}, err
 			}
 			techStack = []string{strings.TrimSpace(mvcFramework)}
-			printDivider(out)
+			tui.Divider(out)
 
 			dbRaw, err := promptSelectWithCustom(in, out, reader, DatabasePrompt)
 			if err != nil {
 				return model.ProjectInput{}, err
 			}
 			database = parseList(dbRaw)
-			printDivider(out)
+			tui.Divider(out)
 		case "split":
 			frontend, err := promptSelectWithCustom(in, out, reader, WebFrontendFrameworkPrompt)
 			if err != nil {
 				return model.ProjectInput{}, err
 			}
-			printDivider(out)
+			tui.Divider(out)
 
 			backend, err := promptSelectWithCustom(in, out, reader, WebBackendFrameworkPrompt)
 			if err != nil {
 				return model.ProjectInput{}, err
 			}
-			printDivider(out)
+			tui.Divider(out)
 
 			dbRaw, err := promptSelectWithCustom(in, out, reader, DatabasePrompt)
 			if err != nil {
 				return model.ProjectInput{}, err
 			}
 			database = parseList(dbRaw)
-			printDivider(out)
+			tui.Divider(out)
 
 			techStack = []string{strings.TrimSpace(frontend), strings.TrimSpace(backend)}
 		default:
-			// Unknown custom architecture: fall back to existing generic tech stack prompts.
 		}
 	}
 
@@ -78,14 +83,14 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 			return model.ProjectInput{}, err
 		}
 		techStack = parseList(techStackRaw)
-		printDivider(out)
+		tui.Divider(out)
 
 		dbRaw, err := promptSelectWithCustom(in, out, reader, DatabasePrompt)
 		if err != nil {
 			return model.ProjectInput{}, err
 		}
 		database = parseList(dbRaw)
-		printDivider(out)
+		tui.Divider(out)
 	}
 
 	// Project Category comes after tech selection so AI can recommend based on chosen tech.
@@ -93,19 +98,19 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 	if err != nil {
 		return model.ProjectInput{}, err
 	}
-	printDivider(out)
+	tui.Divider(out)
 
 	complexity, err := promptSelectWithCustom(in, out, reader, ComplexityPrompt)
 	if err != nil {
 		return model.ProjectInput{}, err
 	}
-	printDivider(out)
+	tui.Divider(out)
 
 	goal, err := promptSelectWithCustom(in, out, reader, ProjectGoalPrompt)
 	if err != nil {
 		return model.ProjectInput{}, err
 	}
-	printDivider(out)
+	tui.Divider(out)
 
 	timeframe, err := promptSelectWithCustom(in, out, reader, EstimatedTimeframePrompt)
 	if err != nil {
@@ -124,9 +129,9 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 }
 
 func promptSelectWithCustom(in *os.File, out io.Writer, reader *bufio.Reader, p SelectPrompt) (string, error) {
-	printHeader(out, p.Title, p.Description)
+	printStepHeader(out, p.Title, p.Description, p.Default.Label)
 	options := buildOptions(p)
-	selection, err := tui.SelectOptionWithDefault(in, out, "Use arrow keys, Enter to confirm.", options, p.Default.Value)
+	selection, err := tui.SelectOptionWithDefault(in, out, "", options, p.Default.Value)
 	if err != nil {
 		return "", err
 	}
@@ -137,9 +142,9 @@ func promptSelectWithCustom(in *os.File, out io.Writer, reader *bufio.Reader, p 
 }
 
 func promptSelectOptionalWithCustom(in *os.File, out io.Writer, reader *bufio.Reader, p SelectPrompt) (string, error) {
-	printHeader(out, p.Title, p.Description)
+	printStepHeader(out, p.Title, p.Description, p.Default.Label)
 	options := buildOptionsOptional(p)
-	selection, err := tui.SelectOptionWithDefault(in, out, "Use arrow keys, Enter to confirm.", options, "skip")
+	selection, err := tui.SelectOptionWithDefault(in, out, "", options, "skip")
 	if err != nil {
 		return "", err
 	}
@@ -190,7 +195,13 @@ func buildOptionsOptional(p SelectPrompt) []tui.Option {
 }
 
 func promptWithDefault(reader *bufio.Reader, out io.Writer, label string, defaultValue string) (string, error) {
-	fmt.Fprintf(out, "%s [%s]:\n> ", label, defaultValue)
+	tui.BlankLine(out)
+	fmt.Fprintln(out, label)
+	if strings.TrimSpace(defaultValue) != "" {
+		tui.DefaultValue(out, defaultValue)
+	}
+	fmt.Fprintln(out, "Input:")
+	fmt.Fprint(out, "> ")
 	line, err := reader.ReadString('\n')
 	if err != nil {
 		return "", err
@@ -203,17 +214,11 @@ func promptWithDefault(reader *bufio.Reader, out io.Writer, label string, defaul
 	return line, nil
 }
 
-func printHeader(out io.Writer, title string, desc string) {
-	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, title)
-	if desc != "" {
-		fmt.Fprintln(out, desc)
-	}
-	fmt.Fprintln(out, "")
-}
-
-func printDivider(out io.Writer) {
-	fmt.Fprintln(out, "----")
+func printStepHeader(out io.Writer, title string, desc string, defaultLabel string) {
+	tui.Heading(out, title)
+	tui.Context(out, desc)
+	tui.DefaultValue(out, defaultLabel)
+	tui.BlankLine(out)
 }
 
 func parseList(v string) []string {
