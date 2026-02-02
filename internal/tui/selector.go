@@ -37,8 +37,8 @@ func SelectOptionWithDefault(in *os.File, out io.Writer, prompt string, options 
 
 	if prompt != "" {
 		BlankLine(out)
-		fmt.Fprintln(out, prompt)
-		ControlsSelect(out)
+		Context(out, prompt)
+		Divider(out)
 		BlankLine(out)
 	}
 	selected := findDefaultIndex(options, defaultID)
@@ -66,7 +66,7 @@ func SelectOptionWithDefault(in *os.File, out io.Writer, prompt string, options 
 			continue
 		}
 
-		moveCursorUp(out, len(options))
+		moveCursorUp(out, len(options)+selectFooterLines)
 		renderOptions(out, options, selected)
 	}
 }
@@ -132,17 +132,24 @@ func readByte(in *os.File) (byte, error) {
 	return buf[0], nil
 }
 
+const selectFooterLines = 2
+
 func renderOptions(out io.Writer, options []Option, selected int) {
 	width := terminalWidth(out)
+	width = clampWidth(width)
 	for i := range options {
-		prefix := "  "
-		if i == selected {
-			prefix = "> "
-		}
 		label := sanitizeOneLine(options[i].Label)
-		label = truncateToWidth(label, width-len(prefix))
-		fmt.Fprintf(out, "\r\033[K%s%s\n", prefix, label)
+		label = truncateToWidth(label, width-4)
+		if i == selected {
+			prefix := style("› ", ColorAccent)
+			fmt.Fprintf(out, "\r\033[K%s%s\n", prefix, style(label, ColorPrimary))
+			continue
+		}
+		fmt.Fprintf(out, "\r\033[K  %s\n", style(label, ColorBody))
 	}
+	// Footer (redrawn during selection updates).
+	fmt.Fprint(out, "\r\033[K\n")
+	fmt.Fprintf(out, "\r\033[K%s\n", style("↑/↓ navigate  ·  Enter select", ColorMuted))
 }
 
 func moveCursorUp(out io.Writer, lines int) {

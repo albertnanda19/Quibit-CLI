@@ -14,10 +14,9 @@ import (
 func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, error) {
 	reader := bufio.NewReader(in)
 
-	tui.Heading(out, "New Project Setup")
-	tui.Context(out, "Choose your preferences. Defaults are preselected; press Enter to accept.")
-	tui.BlankLine(out)
-	tui.ControlsSelect(out)
+	tui.AppHeader(out)
+	tui.Heading(out, "Project setup")
+	tui.Context(out, "Define constraints for generation. Defaults are preselected.")
 	tui.Divider(out)
 
 	appType, err := promptSelectWithCustom(in, out, reader, ApplicationTypePrompt)
@@ -196,11 +195,11 @@ func buildOptionsOptional(p SelectPrompt) []tui.Option {
 
 func promptWithDefault(reader *bufio.Reader, out io.Writer, label string, defaultValue string) (string, error) {
 	tui.BlankLine(out)
-	fmt.Fprintln(out, label)
+	tui.Context(out, label)
 	if strings.TrimSpace(defaultValue) != "" {
 		tui.DefaultValue(out, defaultValue)
 	}
-	fmt.Fprintln(out, "Input:")
+	tui.Divider(out)
 	fmt.Fprint(out, "> ")
 	line, err := reader.ReadString('\n')
 	if err != nil {
@@ -217,7 +216,10 @@ func promptWithDefault(reader *bufio.Reader, out io.Writer, label string, defaul
 func printStepHeader(out io.Writer, title string, desc string, defaultLabel string) {
 	tui.Heading(out, title)
 	tui.Context(out, desc)
-	tui.DefaultValue(out, defaultLabel)
+	if strings.TrimSpace(defaultLabel) != "" {
+		tui.DefaultValue(out, defaultLabel)
+	}
+	tui.Divider(out)
 	tui.BlankLine(out)
 }
 

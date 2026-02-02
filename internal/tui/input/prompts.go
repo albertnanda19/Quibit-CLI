@@ -15,7 +15,7 @@ type SelectPrompt struct {
 
 var ApplicationTypePrompt = SelectPrompt{
 	Title:       "Application Type",
-	Description: "Select the type of project you want to generate.",
+	Description: "Choose what you’re building.",
 	Options: []Option{
 		{Label: "Web Application", Value: "web"},
 		{Label: "Desktop Application", Value: "desktop"},
@@ -24,24 +24,24 @@ var ApplicationTypePrompt = SelectPrompt{
 		{Label: "Mobile Application", Value: "mobile"},
 		{Label: "Backend API / Service", Value: "backend-api"},
 	},
-	CustomLabel: "Custom",
+	CustomLabel: "Custom…",
 	Default:     Option{Label: "Web Application", Value: "web"},
 }
 
 var WebArchitecturePrompt = SelectPrompt{
 	Title:       "Web Architecture",
-	Description: "Choose how you want to structure the web application.",
+	Description: "Select a structure for the web app.",
 	Options: []Option{
 		{Label: "MVC (monolith)", Value: "mvc"},
 		{Label: "Frontend + Backend (separate)", Value: "split"},
 	},
-	CustomLabel: "Custom",
+	CustomLabel: "Custom…",
 	Default:     Option{Label: "Frontend + Backend (separate)", Value: "split"},
 }
 
 var WebMVCFrameworkPrompt = SelectPrompt{
 	Title:       "MVC Framework",
-	Description: "Pick a framework for an MVC-style web application.",
+	Description: "Pick a framework for an MVC-style web app.",
 	Options: []Option{
 		{Label: "Laravel", Value: "laravel"},
 		{Label: "Next.js (fullstack)", Value: "nextjs"},
@@ -50,13 +50,13 @@ var WebMVCFrameworkPrompt = SelectPrompt{
 		{Label: "Spring Boot (MVC)", Value: "spring-boot-mvc"},
 		{Label: "ASP.NET Core MVC", Value: "aspnet-mvc"},
 	},
-	CustomLabel: "Custom",
+	CustomLabel: "Custom…",
 	Default:     Option{Label: "Laravel", Value: "laravel"},
 }
 
 var WebFrontendFrameworkPrompt = SelectPrompt{
 	Title:       "Frontend Framework",
-	Description: "Pick a frontend framework (Custom is available).",
+	Description: "Pick a frontend framework.",
 	Options: []Option{
 		{Label: "React", Value: "react"},
 		{Label: "Vue", Value: "vue"},
@@ -66,13 +66,13 @@ var WebFrontendFrameworkPrompt = SelectPrompt{
 		{Label: "Angular", Value: "angular"},
 		{Label: "Astro", Value: "astro"},
 	},
-	CustomLabel: "Custom",
+	CustomLabel: "Custom…",
 	Default:     Option{Label: "React", Value: "react"},
 }
 
 var WebBackendFrameworkPrompt = SelectPrompt{
 	Title:       "Backend Framework",
-	Description: "Pick a backend framework (Custom is available).",
+	Description: "Pick a backend framework.",
 	Options: []Option{
 		{Label: "Go (Gin)", Value: "go-gin"},
 		{Label: "Go (Fiber)", Value: "go-fiber"},
@@ -83,13 +83,13 @@ var WebBackendFrameworkPrompt = SelectPrompt{
 		{Label: "Django REST Framework", Value: "django-rest"},
 		{Label: "FastAPI", Value: "fastapi"},
 	},
-	CustomLabel: "Custom",
+	CustomLabel: "Custom…",
 	Default:     Option{Label: "Go (Gin)", Value: "go-gin"},
 }
 
 var ProjectKindPrompt = SelectPrompt{
 	Title:       "Project Category (Optional)",
-	Description: "Optional: pick a specific kind of software (or skip to keep results like before).",
+	Description: "Optionally bias the generator toward a specific domain.",
 	Options: []Option{
 		{Label: "Skip (no preference)", Value: ""},
 		{Label: "LMS (Learning Management System)", Value: "lms"},
@@ -103,25 +103,25 @@ var ProjectKindPrompt = SelectPrompt{
 		{Label: "Mobile-first version", Value: "mobile-first"},
 		{Label: "AI project / AI-powered app", Value: "ai-project"},
 	},
-	CustomLabel: "Custom",
-	Default:     Option{Label: "Skip (AI will recommend)", Value: ""},
+	CustomLabel: "Custom…",
+	Default:     Option{Label: "Skip (no preference)", Value: ""},
 }
 
 var ComplexityPrompt = SelectPrompt{
 	Title:       "Complexity Level",
-	Description: "Define the expected difficulty and depth of the project.",
+	Description: "Select the target depth.",
 	Options: []Option{
 		{Label: "Beginner", Value: "beginner"},
 		{Label: "Intermediate", Value: "intermediate"},
 		{Label: "Advanced", Value: "advanced"},
 	},
-	CustomLabel: "Custom",
+	CustomLabel: "Custom…",
 	Default:     Option{Label: "Intermediate", Value: "intermediate"},
 }
 
 var TechnologyStackPrompt = SelectPrompt{
 	Title:       "Technology Stack",
-	Description: "Select or customize the primary technologies.",
+	Description: "Select primary technologies.",
 	Options: []Option{
 		{Label: "Go", Value: "go"},
 		{Label: "React", Value: "react"},
@@ -135,13 +135,13 @@ var TechnologyStackPrompt = SelectPrompt{
 		{Label: "Java", Value: "java"},
 		{Label: "TypeScript", Value: "typescript"},
 	},
-	CustomLabel: "Custom (comma separated)",
+	CustomLabel: "Custom… (comma-separated)",
 	Default:     Option{Label: "Go", Value: "go"},
 }
 
 var DatabasePrompt = SelectPrompt{
 	Title:       "Database(s)",
-	Description: "Select a database preference (or choose no database). Use Custom for multiple databases (comma separated).",
+	Description: "Select a database preference (or none).",
 	Options: []Option{
 		{Label: "No database", Value: "none"},
 		{Label: "PostgreSQL", Value: "postgresql"},
@@ -150,13 +150,13 @@ var DatabasePrompt = SelectPrompt{
 		{Label: "MongoDB", Value: "mongodb"},
 		{Label: "Redis", Value: "redis"},
 	},
-	CustomLabel: "Custom (comma separated)",
+	CustomLabel: "Custom… (comma-separated)",
 	Default:     Option{Label: "No database", Value: "none"},
 }
 
 var ProjectGoalPrompt = SelectPrompt{
 	Title:       "Project Goal",
-	Description: "What is the main purpose of this project?",
+	Description: "Choose the primary intent.",
 	Options: []Option{
 		{Label: "Portfolio Project", Value: "portfolio project"},
 		{Label: "Learning Experiment", Value: "learning experiment"},
@@ -165,18 +165,18 @@ var ProjectGoalPrompt = SelectPrompt{
 		{Label: "Business / B2B tool (internal ops)", Value: "business b2b internal tool"},
 		{Label: "Real-world solution for non-technical users", Value: "real-world solution for non-technical users"},
 	},
-	CustomLabel: "Custom",
+	CustomLabel: "Custom…",
 	Default:     Option{Label: "Portfolio Project", Value: "portfolio project"},
 }
 
 var EstimatedTimeframePrompt = SelectPrompt{
 	Title:       "Estimated Timeframe",
-	Description: "Expected development duration.",
+	Description: "Select an expected delivery window.",
 	Options: []Option{
 		{Label: "1-2 weeks", Value: "1-2 weeks"},
 		{Label: "2-4 weeks", Value: "2-4 weeks"},
 		{Label: "1-3 months", Value: "1-3 months"},
 	},
-	CustomLabel: "Custom",
+	CustomLabel: "Custom…",
 	Default:     Option{Label: "2-4 weeks", Value: "2-4 weeks"},
 }

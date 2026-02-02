@@ -9,32 +9,30 @@ import (
 
 // UI helpers for consistent CLI presentation (no external deps, no flow changes).
 
+func AppHeader(out io.Writer) {
+	BlankLine(out)
+	fmt.Fprintln(out, style("QUIBIT", ColorPrimary))
+	fmt.Fprintln(out, style("Intelligent project generator for engineers.", ColorMuted))
+	Divider(out)
+}
+
 func BlankLine(out io.Writer) {
 	fmt.Fprintln(out, "")
 }
 
 func Divider(out io.Writer) {
-	width := terminalWidth(out)
-	if width <= 0 {
-		width = 80
-	}
-	// Keep dividers readable on wide terminals.
-	if width > 84 {
-		width = 84
-	}
-	if width < 24 {
-		width = 24
-	}
-	fmt.Fprintln(out, strings.Repeat("-", width))
+	width := clampWidth(terminalWidth(out))
+	line := strings.Repeat("─", width)
+	fmt.Fprintln(out, style(line, ColorDivider))
 }
 
 func Heading(out io.Writer, title string) {
 	BlankLine(out)
-	fmt.Fprintln(out, title)
-	u := underlineWidth(title, 42)
-	if u > 0 {
-		fmt.Fprintln(out, strings.Repeat("-", u))
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return
 	}
+	fmt.Fprintln(out, style(title, ColorPrimary))
 }
 
 func Context(out io.Writer, text string) {
@@ -42,7 +40,7 @@ func Context(out io.Writer, text string) {
 	if text == "" {
 		return
 	}
-	fmt.Fprintln(out, text)
+	fmt.Fprintln(out, style(text, ColorBody))
 }
 
 func Hint(out io.Writer, text string) {
@@ -50,7 +48,7 @@ func Hint(out io.Writer, text string) {
 	if text == "" {
 		return
 	}
-	fmt.Fprintf(out, "Hint: %s\n", text)
+	fmt.Fprintln(out, style(text, ColorMuted))
 }
 
 func DefaultValue(out io.Writer, text string) {
@@ -58,11 +56,11 @@ func DefaultValue(out io.Writer, text string) {
 	if text == "" {
 		return
 	}
-	fmt.Fprintf(out, "Default: %s\n", text)
+	fmt.Fprintln(out, style("Default · "+text, ColorMuted))
 }
 
 func ControlsSelect(out io.Writer) {
-	fmt.Fprintln(out, "Controls: ↑/↓ to navigate • Enter to confirm")
+	Hint(out, "↑/↓ navigate  ·  Enter select")
 }
 
 func Status(out io.Writer, text string) {
@@ -71,7 +69,9 @@ func Status(out io.Writer, text string) {
 		return
 	}
 	BlankLine(out)
-	fmt.Fprintf(out, "Status: %s...\n", text)
+	text = strings.TrimSuffix(text, "...")
+	text = strings.TrimSuffix(text, ".")
+	fmt.Fprintln(out, style("• "+text+"…", ColorStatus))
 }
 
 func Done(out io.Writer, text string) {
@@ -79,19 +79,20 @@ func Done(out io.Writer, text string) {
 	if text == "" {
 		return
 	}
-	fmt.Fprintf(out, "Done: %s\n", text)
+	fmt.Fprintln(out, style("✓ "+text, ColorSuccess))
 }
 
 func PrintError(out io.Writer, context string, err error) {
 	if err == nil {
 		return
 	}
-	context = strings.TrimSpace(context)
-	if context == "" {
-		fmt.Fprintf(out, "Error: %s\n", strings.TrimSpace(err.Error()))
-		return
+	BlankLine(out)
+	title := strings.TrimSpace(context)
+	if title == "" {
+		title = "Request failed"
 	}
-	fmt.Fprintf(out, "Error: %s. %s\n", context, strings.TrimSpace(err.Error()))
+	fmt.Fprintln(out, style("ERROR · "+title, ColorErrorTitle))
+	fmt.Fprintln(out, style(strings.TrimSpace(err.Error()), ColorErrorDetail))
 }
 
 func underlineWidth(s string, max int) int {
@@ -107,4 +108,3 @@ func underlineWidth(s string, max int) int {
 	}
 	return n
 }
-

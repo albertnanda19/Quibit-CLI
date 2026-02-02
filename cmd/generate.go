@@ -31,14 +31,16 @@ var generateCmd = &cobra.Command{
 		out := cmd.OutOrStdout()
 		ctx := cmd.Context()
 		for {
+			tui.AppHeader(out)
+			tui.Context(out, "Select a mode.")
 			options := []tui.Option{
-				{ID: "new", Label: "Generate New Project"},
-				{ID: "continue", Label: "Continue Existing Project"},
-				{ID: "view", Label: "View Saved Projects"},
-				{ID: "exit", Label: "Exit"},
+				{ID: "new", Label: "Generate project"},
+				{ID: "continue", Label: "Continue project"},
+				{ID: "view", Label: "View saved projects"},
+				{ID: "exit", Label: "Quit"},
 			}
 
-			selection, err := tui.SelectOption(os.Stdin, out, "Mode:", options)
+			selection, err := tui.SelectOption(os.Stdin, out, "", options)
 			if err != nil {
 				return fmt.Errorf("generate: %w", err)
 			}
@@ -78,7 +80,7 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 	diversityAttempts := 0
 generateLoop:
 	for {
-		tui.Status(out, "Generating project idea")
+		tui.Status(out, "Generating project blueprint")
 
 		var idea ai.ProjectIdea
 		var rawJSON string
@@ -117,22 +119,22 @@ generateLoop:
 		}
 		switch action {
 		case project.SimilarityRegenerate:
-			tui.Status(out, fmt.Sprintf("Similarity score %.2f is high; regenerating", bestScore))
+			tui.Status(out, fmt.Sprintf("Similarity %.2f is high; regenerating", bestScore))
 			pendingReason = ptrRetry(ai.RetrySimilarityTooHigh)
 			pendingStrategy = selectPivotStrategy(ai.RetrySimilarityTooHigh)
 			continue
 		case project.SimilarityBlock:
-			fmt.Fprintf(out, "\nStatus: Similarity score %.2f is too high. Generation stopped.\n", bestScore)
+			tui.PrintError(out, "Generation blocked", fmt.Errorf("similarity %.2f is too high", bestScore))
 			return nil
 		default:
 		}
 
 		printIdea(out, idea)
 
-		selection, err := tui.SelectOption(in, out, "Next action:", []tui.Option{
-			{ID: "accept", Label: "Accept"},
+		selection, err := tui.SelectOption(in, out, "Choose next action.", []tui.Option{
+			{ID: "accept", Label: "Accept and save"},
 			{ID: "regenerate", Label: "Regenerate"},
-			{ID: "regenerate_harder", Label: "Regenerate (higher complexity)"},
+			{ID: "regenerate_harder", Label: "Regenerate (increase complexity)"},
 			{ID: "back", Label: "Back"},
 		})
 		if err != nil {
@@ -151,13 +153,13 @@ generateLoop:
 				return err
 			}
 			tui.BlankLine(out)
-			tui.Done(out, "Project saved")
+			tui.Done(out, "Saved")
 			for {
-				after, _ := tui.SelectOption(in, out, "Next action:", []tui.Option{
-					{ID: "copy", Label: "Copy output to clipboard"},
-					{ID: "same", Label: "Generate another project (same inputs)"},
-					{ID: "same_harder", Label: "Generate another project (higher complexity)"},
-					{ID: "same_easier", Label: "Generate another project (lower complexity)"},
+				after, _ := tui.SelectOption(in, out, "Choose next action.", []tui.Option{
+					{ID: "copy", Label: "Copy output"},
+					{ID: "same", Label: "Generate another (same inputs)"},
+					{ID: "same_harder", Label: "Generate another (increase complexity)"},
+					{ID: "same_easier", Label: "Generate another (decrease complexity)"},
 					{ID: "back", Label: "Back"},
 				})
 				switch after.ID {
@@ -172,7 +174,7 @@ generateLoop:
 						tui.PrintError(out, "Unable to copy to clipboard", err)
 						continue
 					}
-					tui.Done(out, "Copied to clipboard")
+					tui.Done(out, "Copied")
 				case "same":
 					// Keep the same input; just run generation again.
 					diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
@@ -673,8 +675,8 @@ func runProjectEvolution(ctx context.Context, out io.Writer, selected *pmodels.P
 
 		printEvolution(out, evo)
 
-		selection, err := tui.SelectOption(os.Stdin, out, "Next action:", []tui.Option{
-			{ID: "accept", Label: "Accept"},
+		selection, err := tui.SelectOption(os.Stdin, out, "Choose next action.", []tui.Option{
+			{ID: "accept", Label: "Accept and save"},
 			{ID: "regenerate", Label: "Regenerate"},
 			{ID: "back", Label: "Back"},
 		})
@@ -742,8 +744,8 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 	}
 	if len(projects) == 0 {
 		tui.BlankLine(out)
-		fmt.Fprintln(out, "No saved projects found.")
-		tui.Hint(out, "Generate a new project to create your first saved entry.")
+		tui.Context(out, "No saved projects.")
+		tui.Hint(out, "Generate a project to create your first saved entry.")
 		return nil
 	}
 
@@ -755,7 +757,7 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 		})
 	}
 
-	selection, err := tui.SelectOption(os.Stdin, out, "Select a project:", options)
+	selection, err := tui.SelectOption(os.Stdin, out, "Select a project.", options)
 	if err != nil {
 		return err
 	}
@@ -795,8 +797,8 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 	}
 
 	for {
-		after, _ := tui.SelectOption(os.Stdin, out, "Next action:", []tui.Option{
-			{ID: "copy", Label: "Copy output to clipboard"},
+		after, _ := tui.SelectOption(os.Stdin, out, "Choose next action.", []tui.Option{
+			{ID: "copy", Label: "Copy output"},
 			{ID: "back", Label: "Back"},
 		})
 		switch after.ID {
@@ -828,7 +830,7 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 				tui.PrintError(out, "Unable to copy to clipboard", err)
 				continue
 			}
-			tui.Done(out, "Copied to clipboard")
+			tui.Done(out, "Copied")
 		default:
 			return nil
 		}
