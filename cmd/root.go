@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"sync"
 
 	"quibit/internal/db"
 	"quibit/internal/persistence"
@@ -12,6 +13,7 @@ import (
 )
 
 var migrate bool
+var splashOnce sync.Once
 
 var rootCmd = &cobra.Command{
 	Use:           "quibit",
@@ -19,6 +21,11 @@ var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if !migrate {
+			splashOnce.Do(func() {
+				_ = tui.ShowSplashScreen(os.Stdin, cmd.OutOrStdout())
+			})
+		}
 		if migrate {
 			{
 				ctx := cmd.Context()
