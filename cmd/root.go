@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"quibit/internal/config"
@@ -18,6 +19,25 @@ var noAnim bool
 var noSplash bool
 var splashOnce sync.Once
 
+func splashModeFromCmd(cmd *cobra.Command) string {
+	if cmd == nil {
+		return "idle"
+	}
+	name := strings.ToLower(strings.TrimSpace(cmd.Name()))
+	switch name {
+	case "", "quibit":
+		return "idle"
+	case "generate":
+		return "generate"
+	case "continue":
+		return "continue"
+	case "browse":
+		return "browse"
+	default:
+		return "idle"
+	}
+}
+
 var rootCmd = &cobra.Command{
 	Use:           "quibit",
 	Short:         "Quibit is a personal CLI to generate portfolio project ideas.",
@@ -28,7 +48,8 @@ var rootCmd = &cobra.Command{
 		if !migrate {
 			if !noSplash && !config.SplashDisabledByEnv() && !config.HasSeenSplash() {
 				splashOnce.Do(func() {
-					shown, _ := tui.ShowSplashScreen(cmd.Context(), os.Stdin, cmd.OutOrStdout())
+					mode := splashModeFromCmd(cmd)
+					shown, _ := tui.ShowSplashScreen(cmd.Context(), os.Stdin, cmd.OutOrStdout(), mode)
 					if shown {
 						_ = config.MarkSplashSeen()
 					}
@@ -84,4 +105,6 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&noAnim, "no-anim", false, "Disable subtle CLI animations")
 	rootCmd.PersistentFlags().BoolVar(&noSplash, "no-splash", false, "Disable startup splash")
 	rootCmd.AddCommand(generateCmd)
+	rootCmd.AddCommand(continueCmd)
+	rootCmd.AddCommand(browseCmd)
 }

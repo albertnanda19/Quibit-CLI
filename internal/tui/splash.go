@@ -11,7 +11,7 @@ import (
 	"unicode/utf8"
 )
 
-func ShowSplashScreen(ctx context.Context, in *os.File, out io.Writer) (shown bool, err error) {
+func ShowSplashScreen(ctx context.Context, in *os.File, out io.Writer, mode string) (shown bool, err error) {
 	if in == nil || out == nil {
 		return false, nil
 	}
@@ -40,7 +40,7 @@ func ShowSplashScreen(ctx context.Context, in *os.File, out io.Writer) (shown bo
 	}
 
 	underline := strings.Repeat("─", underlineWidth(title, 18))
-	tagline := style("Engineering ideas, not templates.", ColorMuted)
+	tagline := style(splashTagline(mode, width), ColorMuted)
 	createdBy := style("Created by", ColorMuted)
 	author := style("Albert Mangiri", ColorGroupHeader)
 
@@ -56,6 +56,32 @@ func ShowSplashScreen(ctx context.Context, in *os.File, out io.Writer) (shown bo
 	revealLines(ctx, out, lines)
 	fmt.Fprintln(out, "")
 	return true, nil
+}
+
+func splashTagline(mode string, width int) string {
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	if mode == "" {
+		mode = "idle"
+	}
+
+	var base string
+	switch mode {
+	case "generate":
+		base = "Shaping a new project."
+	case "continue":
+		base = "Evolving an existing idea."
+	case "browse":
+		base = "Reviewing your work."
+	default:
+		base = "Engineering ideas, thoughtfully."
+		mode = "idle"
+	}
+
+	// Optional, subtle mode label. Keep it quiet and only when we have space.
+	if mode != "idle" && width >= 44 {
+		base = base + style("  ·  "+mode, ColorDivider)
+	}
+	return base
 }
 
 func revealLines(ctx context.Context, out io.Writer, lines []string) {
