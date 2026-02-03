@@ -89,10 +89,24 @@ func GenerateProjectIdeaWithMeta(ctx context.Context, in model.ProjectInput) (Pr
 	const maxQualityAttempts = 4
 	var lastErr error
 	var lastMeta AIResult
+	var lastVerdict *qualityVerdict
 	for attempt := 0; attempt < maxQualityAttempts; attempt++ {
 		prompt := BuildProjectIdeaPrompt(in)
 		if attempt > 0 {
-			prompt = BuildProjectIdeaPivotPrompt(in, RetryQualityTooGeneric, rotatePivotStrategy(attempt))
+			strategy := rotatePivotStrategy(attempt)
+			if lastVerdict != nil {
+				switch lastVerdict.decision {
+				case qualityRefine:
+					strategy = PivotRefineDepth
+				case qualityPivot:
+					// Force a bigger move for differentiation failures.
+					strategy = PivotContextShift
+				case qualityRegenerate:
+					// Keep rotating to escape generic basins.
+					strategy = rotatePivotStrategy(attempt)
+				}
+			}
+			prompt = BuildProjectIdeaPivotPrompt(in, RetryQualityTooGeneric, strategy)
 		}
 
 		idea, raw, meta, err := generateProjectIdeaWithPrompt(ctx, m, prompt, in)
@@ -107,6 +121,7 @@ func GenerateProjectIdeaWithMeta(ctx context.Context, in model.ProjectInput) (Pr
 			return idea, raw, meta, nil
 		}
 
+		lastVerdict = &v
 		lastErr = fmt.Errorf("generate project idea: quality gate failed: %s", v.summary())
 	}
 
@@ -131,10 +146,24 @@ func GenerateProjectIdeaWithPivotMeta(ctx context.Context, in model.ProjectInput
 	const maxQualityAttempts = 4
 	var lastErr error
 	var lastMeta AIResult
+	var lastVerdict *qualityVerdict
 	for attempt := 0; attempt < maxQualityAttempts; attempt++ {
-		prompt := BuildProjectIdeaPivotPrompt(in, reason, strategy)
-		if attempt > 0 {
-			prompt = BuildProjectIdeaPivotPrompt(in, RetryQualityTooGeneric, rotatePivotStrategy(attempt))
+		var prompt string
+		if attempt == 0 {
+			prompt = BuildProjectIdeaPivotPrompt(in, reason, strategy)
+		} else {
+			nextStrategy := rotatePivotStrategy(attempt)
+			if lastVerdict != nil {
+				switch lastVerdict.decision {
+				case qualityRefine:
+					nextStrategy = PivotRefineDepth
+				case qualityPivot:
+					nextStrategy = PivotContextShift
+				case qualityRegenerate:
+					nextStrategy = rotatePivotStrategy(attempt)
+				}
+			}
+			prompt = BuildProjectIdeaPivotPrompt(in, RetryQualityTooGeneric, nextStrategy)
 		}
 
 		idea, raw, meta, err := generateProjectIdeaWithPrompt(ctx, m, prompt, in)
@@ -148,6 +177,7 @@ func GenerateProjectIdeaWithPivotMeta(ctx context.Context, in model.ProjectInput
 		if v.ok() {
 			return idea, raw, meta, nil
 		}
+		lastVerdict = &v
 		lastErr = fmt.Errorf("generate project idea: quality gate failed: %s", v.summary())
 	}
 

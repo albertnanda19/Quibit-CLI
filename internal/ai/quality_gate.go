@@ -7,14 +7,22 @@ import (
 )
 
 type qualityVerdict struct {
-	passes   int
+	decision qualityDecision
 	hardFail bool
 	reasons  []string
 }
 
+type qualityDecision string
+
+const (
+	qualityAccept     qualityDecision = "ACCEPT"
+	qualityRefine     qualityDecision = "REFINE"
+	qualityPivot      qualityDecision = "PIVOT"
+	qualityRegenerate qualityDecision = "REGENERATE"
+)
+
 func (v qualityVerdict) ok() bool {
-	// Quality bar: pass at least 3 criteria, and no hard-fail.
-	return !v.hardFail && v.passes >= 3
+	return !v.hardFail && v.decision == qualityAccept
 }
 
 func (v qualityVerdict) summary() string {
@@ -22,13 +30,22 @@ func (v qualityVerdict) summary() string {
 		if v.ok() {
 			return "ok"
 		}
-		return fmt.Sprintf("passes=%d", v.passes)
+		if v.decision == "" {
+			return "decision=UNKNOWN"
+		}
+		return fmt.Sprintf("decision=%s", v.decision)
 	}
-	return fmt.Sprintf("passes=%d; %s", v.passes, strings.Join(v.reasons, "; "))
+	if v.decision == "" {
+		return strings.Join(v.reasons, "; ")
+	}
+	return fmt.Sprintf("decision=%s; %s", v.decision, strings.Join(v.reasons, "; "))
 }
 
 func evaluateIdeaQuality(idea ProjectIdea) qualityVerdict {
-	text := strings.ToLower(strings.TrimSpace(strings.Join([]string{
+	// IMPORTANT: This is a harsh portfolio reviewer. If unsure => fail.
+	// The generator output must already be schema-valid. Here we judge whether it deserves to be shown.
+
+	allText := strings.ToLower(strings.TrimSpace(strings.Join([]string{
 		idea.Project.Name,
 		idea.Project.Tagline,
 		idea.Project.Description.Summary,
@@ -48,48 +65,94 @@ func evaluateIdeaQuality(idea ProjectIdea) qualityVerdict {
 		strings.Join(idea.Project.Learning, " "),
 	}, " | ")))
 
-	// Hard-fail clichés unless there is a clear extreme twist.
-	if looksCliche(text) && !hasExtremeTwist(text) {
+	interestingText := strings.ToLower(strings.TrimSpace(strings.Join([]string{
+		idea.Project.ValueProp.WhyThisProjectIsInteresting,
+		idea.Project.ValueProp.PortfolioValue,
+		idea.Project.Tagline,
+		idea.Project.Description.Summary,
+		idea.Project.TechStack.Justification,
+	}, " | ")))
+
+	// 1) Anti-generic / anti-clone hard checks
+	if looksCliche(allText) && !hasExtremeTwist(allText) {
 		return qualityVerdict{
-			passes:   0,
 			hardFail: true,
-			reasons:  []string{"cliche/generic category (todo/chat/blog/ecommerce/weather/url shortener) without an extreme technical twist"},
+			decision: qualityRegenerate,
+			reasons:  []string{"anti-generic FAIL: cliché category without an extreme technical twist"},
+		}
+	}
+	if looksLikeClone(allText) {
+		return qualityVerdict{
+			hardFail: true,
+			decision: qualityRegenerate,
+			reasons:  []string{"anti-generic FAIL: clone framing (\"X clone\" / \"like X\")"},
+		}
+	}
+	if looksLikeCRUD(allText) && !hasTechnicalDepthSignals(allText) && !hasConstraintSignals(allText) && !hasExtremeTwist(allText) {
+		return qualityVerdict{
+			hardFail: true,
+			decision: qualityRegenerate,
+			reasons:  []string{"anti-generic FAIL: CRUD-y scope with no depth/constraints/twist"},
 		}
 	}
 
-	criteria := map[string]bool{
-		"not_crud_generic": !looksLikeCRUD(text),
-		"not_clone":        !looksLikeClone(text),
-		"technical_depth":  hasTechnicalDepthSignals(text),
-		"tradeoffs":        hasTradeoffSignals(text),
-		"interviewable":    hasInterviewSignals(text),
-		"scalable_or_pivot": hasScalabilitySignals(text),
-		"non_trivial_constraints": hasConstraintSignals(text),
-	}
-
-	var passes int
-	var missing []string
-	for k, ok := range criteria {
-		if ok {
-			passes++
-		} else {
-			missing = append(missing, k)
+	// 2) Technical depth: must show a real engineering problem AND at least one trade-off or constraint.
+	technicalDepth := hasTechnicalDepthSignals(allText) || hasExtremeTwist(allText)
+	nonTrivialConstraint := hasConstraintSignals(allText) || hasExtremeTwist(allText)
+	tradeoffs := hasTradeoffSignals(allText)
+	if !technicalDepth {
+		return qualityVerdict{
+			hardFail: true,
+			decision: qualityRegenerate,
+			reasons:  []string{"technical depth FAIL: no concrete engineering depth signals (reads like a thin app idea)"},
 		}
 	}
 
-	v := qualityVerdict{passes: passes}
-	// Extra enforcement: passing "not CRUD" + "not clone" alone is not enough.
-	// We want at least one strong technical signal (depth/constraint/trade-off).
-	strongSignal := criteria["technical_depth"] || criteria["non_trivial_constraints"] || criteria["tradeoffs"]
-	if passes >= 3 && !strongSignal {
-		v.reasons = []string{"quality bar not met: missing strong signals (technical_depth or non_trivial_constraints or tradeoffs)"}
-		return v
+	// 3) Differentiation: must have ONE sharp differentiator that sounds central, not cosmetic.
+	diffOK := hasDifferentiationSignals(interestingText) || (hasExtremeTwist(allText) && hasTechnicalDepthSignals(allText))
+	if !diffOK {
+		// Potentially salvageable by pivoting context/target user to force a unique constraint.
+		return qualityVerdict{
+			decision: qualityPivot,
+			reasons:  []string{"differentiation FAIL: no clear unique core differentiator (would not stop a reviewer from scrolling)"},
+		}
 	}
-	if passes < 3 {
-		// Keep reasons short, but actionable.
-		v.reasons = []string{"quality bar not met (need >=3 criteria): missing " + strings.Join(missing, ", ")}
+
+	// 4) Scope & realism: MVP must be plausible and not a laundry list.
+	scopeOK, scopeReason := scopeRealismCheck(idea)
+	if !scopeOK {
+		return qualityVerdict{
+			decision: qualityRefine,
+			reasons:  []string{"scope/realism FAIL: " + scopeReason},
+		}
 	}
-	return v
+
+	// 5) Portfolio worthiness: must be interviewable, and must explicitly mention trade-offs + constraints.
+	interviewable := hasInterviewSignals(allText)
+	if !interviewable {
+		// If the idea has depth + differentiator but doesn't read interview-ready, refine the writing/angle.
+		return qualityVerdict{
+			decision: qualityRefine,
+			reasons:  []string{"portfolio worthiness FAIL: not clearly interviewable (missing architecture/system-design cues)"},
+		}
+	}
+	if !nonTrivialConstraint || !tradeoffs {
+		// The prompt asks for both; if missing, it's usually a content issue => refine.
+		missing := []string{}
+		if !nonTrivialConstraint {
+			missing = append(missing, "non-trivial constraint")
+		}
+		if !tradeoffs {
+			missing = append(missing, "explicit trade-off")
+		}
+		return qualityVerdict{
+			decision: qualityRefine,
+			reasons:  []string{"technical depth incomplete: missing " + strings.Join(missing, " + ")},
+		}
+	}
+
+	// If it passes all harsh gates, accept.
+	return qualityVerdict{decision: qualityAccept}
 }
 
 func looksCliche(text string) bool {
@@ -105,6 +168,13 @@ func looksCliche(text string) bool {
 		"ecommerce",
 		"shopping cart",
 		"chat app",
+		"expense tracker",
+		"personal finance",
+		"pomodoro",
+		"notes app",
+		"note-taking",
+		"recipe app",
+		"movie tracker",
 	}
 	for _, n := range needles {
 		if strings.Contains(text, n) {
@@ -132,7 +202,12 @@ func looksLikeCRUD(text string) bool {
 		return true
 	}
 	// Heuristic: lots of "manage/add/edit/delete" language and no depth signals.
-	crudish := containsAny(text, "add/edit/delete", "add, edit, delete", "manage users", "manage items", "admin panel")
+	crudish := containsAny(text,
+		"add/edit/delete", "add, edit, delete",
+		"manage users", "manage items", "admin panel", "admin dashboard",
+		"login", "sign in", "sign-up", "register", "authentication",
+		"dashboard", "profile page", "settings page",
+	)
 	return crudish && !hasTechnicalDepthSignals(text) && !hasConstraintSignals(text)
 }
 
@@ -156,6 +231,8 @@ func hasTechnicalDepthSignals(text string) bool {
 		"indexing", "inverted index", "search ranking",
 		"caching", "cache invalidation",
 		"consistency", "distributed", "replication",
+		"crdt", "offline-first", "local-first",
+		"vector", "embedding", "retrieval", "rag",
 	)
 }
 
@@ -196,6 +273,70 @@ func hasInterviewSignals(text string) bool {
 	)
 }
 
+func hasDifferentiationSignals(text string) bool {
+	// A differentiator must be concrete (protocol/architecture/constraint), not just "modern/fast/easy".
+	if hasExtremeTwist(text) {
+		return true
+	}
+	return containsAny(text,
+		"tamper-evident", "append-only log", "merkle",
+		"deterministic replay",
+		"threat model",
+		"policy engine", "rego", "opa",
+		"crdt", "local-first", "offline-first",
+		"zero-knowledge", "zk", "end-to-end encryption", "e2ee",
+		"differential privacy", "privacy budget",
+		"backpressure", "outbox", "saga", "idempotency",
+		"vector index", "inverted index",
+	)
+}
+
+func scopeRealismCheck(idea ProjectIdea) (bool, string) {
+	must := idea.Project.MVP.MustHave
+	nice := idea.Project.MVP.NiceToHave
+	out := idea.Project.MVP.OutOfScope
+
+	if len(must) >= 8 {
+		return false, "MVP must-have list is too large (>=8) for a solo MVP"
+	}
+
+	// Count "big rocks" that typically explode MVP scope.
+	bigRockCount := 0
+	all := strings.ToLower(strings.Join(must, " | "))
+	bigRocks := []string{
+		"payments", "subscription", "billing",
+		"marketplace",
+		"recommendation", "ranking",
+		"real-time chat", "messaging",
+		"social feed",
+		"multi-tenant",
+		"admin dashboard", "admin panel",
+		"ml training", "train model",
+	}
+	for _, k := range bigRocks {
+		if strings.Contains(all, k) {
+			bigRockCount++
+		}
+	}
+	if bigRockCount >= 3 {
+		return false, "too many big-scope features packed into MVP (payments/chat/recommendations/multi-tenant/etc.)"
+	}
+
+	// If nice-to-have and out-of-scope are empty-ish or fluffy, scope definition is weak.
+	fluff := func(items []string) bool {
+		if len(items) == 0 {
+			return true
+		}
+		joined := strings.ToLower(strings.Join(items, " | "))
+		// "etc" / "more features" is scope handwaving.
+		return containsAny(joined, "etc", "more features", "improvements", "enhancements", "tbd") && len(items) <= 2
+	}
+	if fluff(nice) || fluff(out) {
+		return false, "scope lists are too vague (nice-to-have/out-of-scope read like placeholders)"
+	}
+	return true, ""
+}
+
 func containsAny(text string, needles ...string) bool {
 	for _, n := range needles {
 		if n == "" {
@@ -207,4 +348,3 @@ func containsAny(text string, needles ...string) bool {
 	}
 	return false
 }
-

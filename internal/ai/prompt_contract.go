@@ -102,6 +102,7 @@ const (
 	PivotChangeTargetUser   PivotStrategy = "CHANGE_TARGET_USER"
 	PivotFeatureReplacement PivotStrategy = "FEATURE_REPLACEMENT"
 	PivotContextShift       PivotStrategy = "CONTEXT_SHIFT"
+	PivotRefineDepth        PivotStrategy = "REFINE_DEPTH"
 )
 
 func BuildProjectIdeaPrompt(in model.ProjectInput) string {
@@ -249,6 +250,8 @@ func pivotStrategyInstruction(strategy PivotStrategy) string {
 		return "- Replace 2-3 key MVP items with different capabilities and adjust the main workflow."
 	case PivotContextShift:
 		return "- Shift the domain context or problem framing while keeping the input constraints."
+	case PivotRefineDepth:
+		return "- Keep the SAME core idea, but make it interview-grade: add one hard non-trivial engineering constraint, add at least one explicit trade-off (X vs Y), articulate ONE sharp differentiator that is central to the design, and reduce the MVP to a truly minimal slice."
 	default:
 		return "- Replace 2-3 key MVP items with different capabilities and adjust the main workflow."
 	}
