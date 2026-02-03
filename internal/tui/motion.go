@@ -121,7 +121,8 @@ func (s *Spinner) paint(frame string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	fmt.Fprintf(s.out, "\r\033[K%s", style("• "+s.message+" "+frame, ColorStatus))
+	l := LayoutFor(s.out)
+	fmt.Fprintf(s.out, "\r\033[K%s%s", leftPad(l.HPad()), style("• "+s.message+" "+frame, ColorStatus))
 }
 
 func (s *Spinner) clear() {

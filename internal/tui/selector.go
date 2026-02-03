@@ -184,25 +184,26 @@ func readByte(in *os.File) (byte, error) {
 const selectFooterLines = 2
 
 func renderEntries(out io.Writer, entries []SelectEntry, selected int) {
-	width := terminalWidth(out)
-	width = clampWidth(width)
+	l := LayoutFor(out)
+	width := l.ContentWidth()
+	pad := leftPad(l.HPad())
 	for i := range entries {
 		label := sanitizeOneLine(entries[i].Label)
-		label = truncateToWidth(label, width-4)
+		label = truncateToWidth(label, width-6) // room for selection prefix + spacing
 		if !entries[i].Selectable {
-			fmt.Fprintf(out, "\r\033[K%s\n", style(label, ColorGroupHeader))
+			fmt.Fprintf(out, "\r\033[K%s%s\n", pad, style(label, ColorGroupHeader))
 			continue
 		}
 		if i == selected {
 			prefix := style("› ", ColorAccent)
-			fmt.Fprintf(out, "\r\033[K%s%s\n", prefix, style(label, ColorPrimary))
+			fmt.Fprintf(out, "\r\033[K%s%s%s\n", pad, prefix, style(label, ColorPrimary))
 			continue
 		}
-		fmt.Fprintf(out, "\r\033[K  %s\n", style(label, ColorBody))
+		fmt.Fprintf(out, "\r\033[K%s  %s\n", pad, style(label, ColorBody))
 	}
 
 	fmt.Fprint(out, "\r\033[K\n")
-	fmt.Fprintf(out, "\r\033[K%s\n", style("↑/↓ navigate  ·  Enter select", ColorMuted))
+	fmt.Fprintf(out, "\r\033[K%s%s\n", pad, style("↑/↓ navigate  ·  Enter select", ColorMuted))
 }
 
 func moveCursorUp(out io.Writer, lines int) {

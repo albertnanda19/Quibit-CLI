@@ -77,7 +77,6 @@ func splashTagline(mode string, width int) string {
 		mode = "idle"
 	}
 
-	// Optional, subtle mode label. Keep it quiet and only when we have space.
 	if mode != "idle" && width >= 44 {
 		base = base + style("  ·  "+mode, ColorDivider)
 	}
@@ -130,31 +129,6 @@ func centerLine(s string, width int) string {
 		return s
 	}
 	return strings.Repeat(" ", pad) + s
-}
-
-func stripANSI(s string) string {
-
-	out := make([]rune, 0, len(s))
-	rs := []rune(s)
-	for i := 0; i < len(rs); i++ {
-		if rs[i] != 0x1b {
-			out = append(out, rs[i])
-			continue
-		}
-
-		if i+1 < len(rs) && rs[i+1] == '[' {
-			i += 2
-			for i < len(rs) {
-
-				if (rs[i] >= 'A' && rs[i] <= 'Z') || (rs[i] >= 'a' && rs[i] <= 'z') {
-					break
-				}
-				i++
-			}
-			continue
-		}
-	}
-	return string(out)
 }
 
 func buildVersion() string {

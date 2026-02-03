@@ -197,7 +197,7 @@ func promptWithDefault(reader *bufio.Reader, out io.Writer, label string, defaul
 		tui.DefaultValue(out, defaultValue)
 	}
 	tui.Divider(out)
-	fmt.Fprint(out, "> ")
+	fmt.Fprint(out, tui.PromptPrefix(out))
 	line, err := reader.ReadString('\n')
 	if err != nil {
 		return "", err
