@@ -1,0 +1,53 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+
+# Environment files
+.env
+.env.example
+
+# Docker files
+Dockerfile
+.dockerignore
+run.sh
+run.ps1
+
+# Go build artifacts
+quibit
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test and temporary files
+*_test.go
+*.test
+*.out
+coverage.txt
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary directories
+tmp/
+temp/

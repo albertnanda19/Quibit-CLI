@@ -25,6 +25,7 @@ Repo ini: [Quibit-CLI](https://github.com/albertnanda19/Quibit-CLI)
 ## Fitur Utama (Output)
 
 Saat generate project baru, Quibit menampilkan (contoh):
+
 - Title/Tagline, Summary, Detailed Explanation
 - Problem Statement + Why It Matters + Current Gaps
 - Target Users + Use Cases
@@ -36,15 +37,67 @@ Saat generate project baru, Quibit menampilkan (contoh):
 
 ## Prasyarat
 
+### 🐳 Cara Docker (Recommended)
+
+- **Docker** & **Docker Compose** (untuk build & run container)
+- **Git** (untuk clone repository)
+
+### 💻 Cara Manual (Go Development)
+
 - **Go**: `go 1.25.5` (lihat `go.mod`)
 - **PostgreSQL** (karena penyimpanan menggunakan Postgres via `DATABASE_URL`)
 - API key:
   - `GEMINI_API_KEY` (wajib untuk primary provider)
   - `HF_TOKEN` (wajib agar fallback Hugging Face bisa dipakai)
 
-## Instalasi & Menjalankan
+## Cara Menjalankan
 
-### 1) Clone repository
+### 🐳 Cara Docker (Recommended - Zero Setup)
+
+**Clone & Run dalam satu langkah:**
+
+```bash
+# Clone repository
+git clone https://github.com/albertnanda19/Quibit-CLI.git
+cd Quibit-CLI
+
+# Jalankan langsung (Linux/macOS)
+./run.sh
+
+# Untuk Windows
+./run.ps1
+```
+
+**Commands yang tersedia:**
+
+```bash
+# Generate project baru
+./run.sh generate
+
+# Lihat project tersimpan
+./run.sh browse
+
+# Lanjutkan project existing
+./run.sh continue
+
+# Run database migration
+./run.sh --migrate
+
+# Bantuan
+./run.sh --help
+```
+
+**Apa yang terjadi di balik layar:**
+
+- ✅ Auto-build Docker image (multi-stage: golang builder + alpine runtime)
+- ✅ Jalankan container secara interactive dengan TTY support
+- ✅ Auto-load `.env` jika ada
+- ✅ Auto-cleanup container setelah exit
+- ✅ Non-root user untuk security
+
+### 💻 Cara Manual (Go Development)
+
+#### 1) Clone repository
 
 **SSH**
 
@@ -64,13 +117,13 @@ Lalu masuk folder:
 cd Quibit-CLI
 ```
 
-### 2) Install dependencies Go
+#### 2) Install dependencies Go
 
 ```bash
 go mod download
 ```
 
-### 3) Setup environment variables
+#### 3) Setup environment variables
 
 Quibit membaca env dari environment atau `.env` (opsional).
 
@@ -88,13 +141,13 @@ GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 HF_TOKEN=YOUR_HUGGINGFACE_TOKEN
 ```
 
-### 4) Jalankan database migration
+#### 4) Jalankan database migration
 
 ```bash
 go run . --migrate
 ```
 
-### 5) Jalankan CLI
+#### 5) Jalankan CLI
 
 ```bash
 go run .
@@ -109,10 +162,30 @@ go build -o quibit .
 
 ## Cara Pakai
 
-Jalankan:
+### Via Docker (Recommended)
 
 ```bash
+# Generate project baru
+./run.sh generate
+
+# Browse saved projects
+./run.sh browse
+
+# Continue existing project
+./run.sh continue
+```
+
+### Via Manual (Go)
+
+```bash
+# Generate project baru
 go run . generate
+
+# Browse saved projects
+go run . browse
+
+# Continue existing project
+go run . continue
 ```
 
 ### Menu utama
@@ -125,6 +198,7 @@ go run . generate
 ### Input yang tersedia (Generate New Project)
 
 Quibit akan menanyakan beberapa input (sebagian bisa Custom):
+
 - Application Type (web/cli/mobile/desktop/ml/backend-api, dll)
 - Project Category (Optional) — LMS/ERP/CRM/SCM, dsb (bisa skip)
 - Complexity
@@ -136,6 +210,7 @@ Quibit akan menanyakan beberapa input (sebagian bisa Custom):
 ### Regenerate
 
 Setelah output muncul, tersedia opsi:
+
 - **Accept**: simpan ke DB
 - **Regenerate**: generate ulang
 - **Regenerate (higher complexity)**: generate ulang dengan complexity dinaikkan (beginner→intermediate→advanced)
@@ -144,23 +219,55 @@ Setelah output muncul, tersedia opsi:
 ## AI Providers
 
 ### Primary: Gemini
+
 - Env: `GEMINI_API_KEY`
 
 ### Fallback: Hugging Face Router (OpenAI-compatible)
+
 - Base URL: `https://router.huggingface.co/v1`
 - Model default: `moonshotai/Kimi-K2-Instruct-0905`
 - Env: `HF_TOKEN`
 
 ## Troubleshooting
 
-### `DATABASE_URL is required`
+### Docker Issues
+
+#### `docker: command not found`
+
+- Install Docker Desktop (Windows/macOS) atau Docker Engine (Linux)
+- Pastikan Docker sudah di-add ke PATH
+
+#### `Docker daemon is not running`
+
+- Start Docker Desktop (Windows/macOS)
+- Atau jalankan `sudo systemctl start docker` (Linux)
+
+#### Container name conflict
+
+- Script otomatis menggunakan unique name dengan timestamp
+- Jika masih error, jalankan: `docker rm -f quibit-runner`
+
+### Manual Go Issues
+
+#### `DATABASE_URL is required`
+
 - Pastikan `DATABASE_URL` ter-set di environment atau `.env`
 
-### `GEMINI_API_KEY is required` / `HF_TOKEN is required`
+#### `GEMINI_API_KEY is required` / `HF_TOKEN is required`
+
 - Pastikan env sudah terisi. Quibit butuh `HF_TOKEN` agar fallback bisa bekerja.
 
-### Migrasi / schema berubah
+#### Migrasi / schema berubah
+
 - Jalankan ulang:
+
+**Docker:**
+
+```bash
+./run.sh --migrate
+```
+
+**Manual:**
 
 ```bash
 go run . --migrate
