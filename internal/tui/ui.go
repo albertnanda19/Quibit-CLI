@@ -7,8 +7,6 @@ import (
 	"unicode/utf8"
 )
 
-// UI helpers for consistent CLI presentation (no external deps, no flow changes).
-
 func AppHeader(out io.Writer) {
 	BlankLine(out)
 	fmt.Fprintln(out, style("QUIBIT", ColorPrimary))

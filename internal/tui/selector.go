@@ -200,7 +200,7 @@ func renderEntries(out io.Writer, entries []SelectEntry, selected int) {
 		}
 		fmt.Fprintf(out, "\r\033[K  %s\n", style(label, ColorBody))
 	}
-	// Footer (redrawn during selection updates).
+
 	fmt.Fprint(out, "\r\033[K\n")
 	fmt.Fprintf(out, "\r\033[K%s\n", style("↑/↓ navigate  ·  Enter select", ColorMuted))
 }
@@ -213,7 +213,7 @@ func moveCursorUp(out io.Writer, lines int) {
 }
 
 func terminalWidth(out io.Writer) int {
-	// Default to a safe width if we can't detect terminal size.
+
 	const fallback = 100
 
 	type fdWriter interface{ Fd() uintptr }
@@ -238,7 +238,7 @@ func truncateToWidth(s string, width int) string {
 	if width <= 0 {
 		return ""
 	}
-	// avoid weird tiny widths
+
 	if width < 10 {
 		width = 10
 	}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"sync"
 
+	"quibit/internal/config"
 	"quibit/internal/db"
 	"quibit/internal/persistence"
 	"quibit/internal/tui"
@@ -14,6 +15,7 @@ import (
 
 var migrate bool
 var noAnim bool
+var noSplash bool
 var splashOnce sync.Once
 
 var rootCmd = &cobra.Command{
@@ -22,12 +24,16 @@ var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Global UI motion toggle (spinner/micro-delays). No business logic impact.
 		tui.SetMotionEnabled(!noAnim)
 		if !migrate {
-			splashOnce.Do(func() {
-				_ = tui.ShowSplashScreen(os.Stdin, cmd.OutOrStdout())
-			})
+			if !noSplash && !config.SplashDisabledByEnv() && !config.HasSeenSplash() {
+				splashOnce.Do(func() {
+					shown, _ := tui.ShowSplashScreen(cmd.Context(), os.Stdin, cmd.OutOrStdout())
+					if shown {
+						_ = config.MarkSplashSeen()
+					}
+				})
+			}
 		}
 		if migrate {
 			{
@@ -76,5 +82,6 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&migrate, "migrate", false, "Run database migrations")
 	rootCmd.PersistentFlags().BoolVar(&noAnim, "no-anim", false, "Disable subtle CLI animations")
+	rootCmd.PersistentFlags().BoolVar(&noSplash, "no-splash", false, "Disable startup splash")
 	rootCmd.AddCommand(generateCmd)
 }

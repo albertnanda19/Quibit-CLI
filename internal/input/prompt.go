@@ -182,7 +182,6 @@ func CollectProjectInput() (model.ProjectInput, error) {
 
 			techStack = []string{strings.TrimSpace(frontend), strings.TrimSpace(backend)}
 		default:
-			// unknown custom arch: fallback to generic prompt
 		}
 	}
 

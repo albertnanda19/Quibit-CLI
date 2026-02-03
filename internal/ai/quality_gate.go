@@ -42,8 +42,6 @@ func (v qualityVerdict) summary() string {
 }
 
 func evaluateIdeaQuality(idea ProjectIdea) qualityVerdict {
-	// IMPORTANT: This is a harsh portfolio reviewer. If unsure => fail.
-	// The generator output must already be schema-valid. Here we judge whether it deserves to be shown.
 
 	allText := strings.ToLower(strings.TrimSpace(strings.Join([]string{
 		idea.Project.Name,
@@ -73,7 +71,6 @@ func evaluateIdeaQuality(idea ProjectIdea) qualityVerdict {
 		idea.Project.TechStack.Justification,
 	}, " | ")))
 
-	// 1) Anti-generic / anti-clone hard checks
 	if looksCliche(allText) && !hasExtremeTwist(allText) {
 		return qualityVerdict{
 			hardFail: true,
@@ -96,7 +93,6 @@ func evaluateIdeaQuality(idea ProjectIdea) qualityVerdict {
 		}
 	}
 
-	// 2) Technical depth: must show a real engineering problem AND at least one trade-off or constraint.
 	technicalDepth := hasTechnicalDepthSignals(allText) || hasExtremeTwist(allText)
 	nonTrivialConstraint := hasConstraintSignals(allText) || hasExtremeTwist(allText)
 	tradeoffs := hasTradeoffSignals(allText)
@@ -108,17 +104,14 @@ func evaluateIdeaQuality(idea ProjectIdea) qualityVerdict {
 		}
 	}
 
-	// 3) Differentiation: must have ONE sharp differentiator that sounds central, not cosmetic.
 	diffOK := hasDifferentiationSignals(interestingText) || (hasExtremeTwist(allText) && hasTechnicalDepthSignals(allText))
 	if !diffOK {
-		// Potentially salvageable by pivoting context/target user to force a unique constraint.
 		return qualityVerdict{
 			decision: qualityPivot,
 			reasons:  []string{"differentiation FAIL: no clear unique core differentiator (would not stop a reviewer from scrolling)"},
 		}
 	}
 
-	// 4) Scope & realism: MVP must be plausible and not a laundry list.
 	scopeOK, scopeReason := scopeRealismCheck(idea)
 	if !scopeOK {
 		return qualityVerdict{
@@ -127,17 +120,14 @@ func evaluateIdeaQuality(idea ProjectIdea) qualityVerdict {
 		}
 	}
 
-	// 5) Portfolio worthiness: must be interviewable, and must explicitly mention trade-offs + constraints.
 	interviewable := hasInterviewSignals(allText)
 	if !interviewable {
-		// If the idea has depth + differentiator but doesn't read interview-ready, refine the writing/angle.
 		return qualityVerdict{
 			decision: qualityRefine,
 			reasons:  []string{"portfolio worthiness FAIL: not clearly interviewable (missing architecture/system-design cues)"},
 		}
 	}
 	if !nonTrivialConstraint || !tradeoffs {
-		// The prompt asks for both; if missing, it's usually a content issue => refine.
 		missing := []string{}
 		if !nonTrivialConstraint {
 			missing = append(missing, "non-trivial constraint")
@@ -151,7 +141,6 @@ func evaluateIdeaQuality(idea ProjectIdea) qualityVerdict {
 		}
 	}
 
-	// If it passes all harsh gates, accept.
 	return qualityVerdict{decision: qualityAccept}
 }
 
@@ -185,7 +174,6 @@ func looksCliche(text string) bool {
 }
 
 func hasExtremeTwist(text string) bool {
-	// Allow clichés only when clearly constrained or technically special.
 	return containsAny(text,
 		"end-to-end encryption", "e2ee", "zero-knowledge",
 		"differential privacy", "privacy budget",
@@ -201,7 +189,6 @@ func looksLikeCRUD(text string) bool {
 	if containsAny(text, "crud", "create read update delete", "create, read, update, delete") {
 		return true
 	}
-	// Heuristic: lots of "manage/add/edit/delete" language and no depth signals.
 	crudish := containsAny(text,
 		"add/edit/delete", "add, edit, delete",
 		"manage users", "manage items", "admin panel", "admin dashboard",
@@ -212,7 +199,6 @@ func looksLikeCRUD(text string) bool {
 }
 
 func looksLikeClone(text string) bool {
-	// "X clone" or "like X" patterns.
 	if containsAny(text, " clone", "like trello", "like notion", "like spotify", "like netflix", "like uber") {
 		return true
 	}
@@ -274,7 +260,6 @@ func hasInterviewSignals(text string) bool {
 }
 
 func hasDifferentiationSignals(text string) bool {
-	// A differentiator must be concrete (protocol/architecture/constraint), not just "modern/fast/easy".
 	if hasExtremeTwist(text) {
 		return true
 	}
@@ -300,7 +285,6 @@ func scopeRealismCheck(idea ProjectIdea) (bool, string) {
 		return false, "MVP must-have list is too large (>=8) for a solo MVP"
 	}
 
-	// Count "big rocks" that typically explode MVP scope.
 	bigRockCount := 0
 	all := strings.ToLower(strings.Join(must, " | "))
 	bigRocks := []string{
@@ -322,13 +306,11 @@ func scopeRealismCheck(idea ProjectIdea) (bool, string) {
 		return false, "too many big-scope features packed into MVP (payments/chat/recommendations/multi-tenant/etc.)"
 	}
 
-	// If nice-to-have and out-of-scope are empty-ish or fluffy, scope definition is weak.
 	fluff := func(items []string) bool {
 		if len(items) == 0 {
 			return true
 		}
 		joined := strings.ToLower(strings.Join(items, " | "))
-		// "etc" / "more features" is scope handwaving.
 		return containsAny(joined, "etc", "more features", "improvements", "enhancements", "tbd") && len(items) <= 2
 	}
 	if fluff(nice) || fluff(out) {

@@ -18,7 +18,6 @@ func databasePreferenceLine(dbs []string) string {
 	}
 	b, err := json.Marshal(dbs)
 	if err != nil {
-		// fallback: comma-separated
 		return "- database_preference: " + strings.Join(dbs, ", ") + "\n"
 	}
 	return "- database_preference: " + string(b) + "\n"
@@ -34,10 +33,8 @@ func normalizeDBList(in []string) []string {
 		out = append(out, v)
 	}
 	if len(out) == 0 {
-		// default to none if caller didn't specify anything
 		return []string{"none"}
 	}
-	// If mixed with "none", drop "none".
 	hasNone := false
 	for _, v := range out {
 		if v == "none" {
@@ -55,7 +52,6 @@ func normalizeDBList(in []string) []string {
 		}
 		out = filtered
 	}
-	// De-dup while preserving order.
 	seen := map[string]struct{}{}
 	dedup := make([]string, 0, len(out))
 	for _, v := range out {

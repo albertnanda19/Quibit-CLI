@@ -99,8 +99,6 @@ generateLoop:
 			return fmt.Errorf("generate: %w", err)
 		}
 
-		// In-session diversity guard: when user regenerates (or generates again with same inputs),
-		// avoid returning an idea that's basically identical except the name.
 		if diversityRef != nil {
 			current := makeSnapshotFromIdea(idea, input)
 			score := project.JaccardSimilarity(current, *diversityRef)
@@ -111,7 +109,6 @@ generateLoop:
 				pendingStrategy = rotatePivotStrategy(diversityAttempts)
 				continue
 			}
-			// stop enforcing once we got something distinct enough (or we hit attempt cap)
 			diversityRef = nil
 			diversityAttempts = 0
 		}
@@ -184,14 +181,12 @@ generateLoop:
 					}
 					tui.Done(out, "Copied")
 				case "same":
-					// Keep the same input; just run generation again.
 					diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
 					diversityAttempts = 0
 					pendingReason = nil
 					lastReasonUsed = nil
 					continue generateLoop
 				case "same_harder":
-					// Keep the same input; increase complexity then generate again.
 					input.Complexity = bumpComplexity(input.Complexity)
 					diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
 					diversityAttempts = 0
@@ -199,7 +194,6 @@ generateLoop:
 					lastReasonUsed = nil
 					continue generateLoop
 				case "same_easier":
-					// Keep the same input; decrease complexity then generate again.
 					input.Complexity = lowerComplexity(input.Complexity)
 					diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
 					diversityAttempts = 0
@@ -316,7 +310,6 @@ func saveGeneratedProject(ctx context.Context, input model.ProjectInput, idea ai
 		return fmt.Errorf("generate: save project: %w", err)
 	}
 
-	// Persist structured feature lists to project_features so nothing is lost in downstream usage.
 	var features []pmodels.ProjectFeature
 	appendFeatures := func(typ string, items []string) {
 		for _, v := range items {
@@ -345,7 +338,6 @@ func saveGeneratedProject(ctx context.Context, input model.ProjectInput, idea ai
 		}
 	}
 
-	// Also store a compact meta record (in addition to raw_ai_output on projects) for easy querying.
 	targetUsersJSON, err := json.Marshal(map[string]any{
 		"primary":   idea.Project.TargetUsers.Primary,
 		"secondary": idea.Project.TargetUsers.Secondary,
@@ -507,7 +499,6 @@ func bumpComplexity(v string) string {
 	case "advanced":
 		return "advanced"
 	default:
-		// Preserve current behavior if user entered a custom complexity string.
 		return strings.TrimSpace(v)
 	}
 }
@@ -522,7 +513,6 @@ func lowerComplexity(v string) string {
 	case "beginner":
 		return "beginner"
 	default:
-		// Preserve current behavior if user entered a custom complexity string.
 		return strings.TrimSpace(v)
 	}
 }
@@ -870,7 +860,6 @@ func buildSavedProjectEntries(projects []pmodels.Project) []tui.SelectEntry {
 		groups[title].Items = append(groups[title].Items, projects[i])
 	}
 
-	// Header rows are non-selectable; only projects are selectable.
 	entries := make([]tui.SelectEntry, 0, len(projects)+len(order))
 	for _, title := range order {
 		g := groups[title]
@@ -913,7 +902,6 @@ func savedProjectGroupTitle(appType string) string {
 		return "Backend / API Service"
 	}
 
-	// Tolerate custom types (free text) without nested-if chaos.
 	if strings.Contains(s, "web") || strings.Contains(s, "frontend") || strings.Contains(s, "fullstack") {
 		return "Web Application"
 	}

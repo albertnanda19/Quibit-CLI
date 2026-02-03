@@ -85,7 +85,6 @@ func GenerateProjectIdeaWithMeta(ctx context.Context, in model.ProjectInput) (Pr
 		return ProjectIdea{}, "", AIResult{}, err
 	}
 
-	// Quality gate: regenerate internally until the idea is non-cliché and has real depth.
 	const maxQualityAttempts = 4
 	var lastErr error
 	var lastMeta AIResult
@@ -99,10 +98,8 @@ func GenerateProjectIdeaWithMeta(ctx context.Context, in model.ProjectInput) (Pr
 				case qualityRefine:
 					strategy = PivotRefineDepth
 				case qualityPivot:
-					// Force a bigger move for differentiation failures.
 					strategy = PivotContextShift
 				case qualityRegenerate:
-					// Keep rotating to escape generic basins.
 					strategy = rotatePivotStrategy(attempt)
 				}
 			}
@@ -142,7 +139,6 @@ func GenerateProjectIdeaWithPivotMeta(ctx context.Context, in model.ProjectInput
 		return ProjectIdea{}, "", AIResult{}, err
 	}
 
-	// Respect caller pivot on first attempt; if still generic, keep pivoting internally.
 	const maxQualityAttempts = 4
 	var lastErr error
 	var lastMeta AIResult
@@ -401,7 +397,6 @@ func matchesInputTechStack(stack ProjectTechStack, input []string) bool {
 }
 
 func normalizeToken(s string) string {
-	// keep only [a-z0-9] to avoid false negatives like "nodejs" vs "node.js" or "spring-boot" vs "spring boot"
 	s = strings.ToLower(strings.TrimSpace(s))
 	if s == "" {
 		return ""
@@ -417,8 +412,6 @@ func normalizeToken(s string) string {
 }
 
 func requiredTechTokens(v string) []string {
-	// Split tech choices like "go-gin" / "nodejs-express" into required core tokens.
-	// Drop purely descriptive suffixes like "frontend/backend/api/mvc" so the model can express it naturally.
 	parts := splitAlphaNumTokens(v)
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
@@ -432,7 +425,6 @@ func requiredTechTokens(v string) []string {
 		out = append(out, p)
 	}
 
-	// If everything was descriptor-y (e.g. "frontend"), fall back to the full token.
 	if len(out) == 0 {
 		fallback := normalizeToken(v)
 		if fallback != "" && !isTechDescriptor(fallback) {

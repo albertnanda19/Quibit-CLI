@@ -1,96 +1,151 @@
 package tui
 
 import (
-	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"runtime/debug"
+	"strings"
+	"time"
+	"unicode/utf8"
 )
 
-// ShowSplashScreen renders a startup splash once per process (caller enforces once).
-// It is terminal-safe: if stdin/stdout are not TTY, it becomes a no-op.
-func ShowSplashScreen(in *os.File, out io.Writer) error {
+func ShowSplashScreen(ctx context.Context, in *os.File, out io.Writer) (shown bool, err error) {
 	if in == nil || out == nil {
-		return nil
+		return false, nil
 	}
 	if !isTerminal(int(in.Fd())) {
-		return nil
+		return false, nil
 	}
 	type fdWriter interface{ Fd() uintptr }
 	fw, ok := out.(fdWriter)
 	if !ok || !isTerminal(int(fw.Fd())) {
-		return nil
+		return false, nil
 	}
 
-	// Clear screen and move cursor home.
-	fmt.Fprint(out, "\033[2J\033[H")
+	width := clampWidth(terminalWidth(out))
 
-	// Render spaced title: Q U I B I T (block-style, symmetric, calm).
-	q := []string{
-		" █████ ",
-		"██   ██",
-		"██   ██",
-		"██ █ ██",
-		"██  ███",
-		" ██████",
-	}
-	u := []string{
-		"██   ██",
-		"██   ██",
-		"██   ██",
-		"██   ██",
-		"██   ██",
-		" █████ ",
-	}
-	i := []string{
-		"██████",
-		"  ██  ",
-		"  ██  ",
-		"  ██  ",
-		"  ██  ",
-		"██████",
-	}
-	b := []string{
-		"█████ ",
-		"██  ██",
-		"█████ ",
-		"██  ██",
-		"██  ██",
-		"█████ ",
-	}
-	t := []string{
-		"██████",
-		"  ██  ",
-		"  ██  ",
-		"  ██  ",
-		"  ██  ",
-		"  ██  ",
+	title := "quibit"
+	version := buildVersion()
+	titleLine := title
+	if version != "" {
+		titleLine = title + "  " + style(version, ColorMuted)
+	} else {
+		titleLine = style(titleLine, ColorPrimary)
 	}
 
-	BlankLine(out)
-	for row := 0; row < 6; row++ {
-		line := q[row] + "  " + u[row] + "  " + i[row] + "  " + b[row] + "  " + i[row] + "  " + t[row]
-		fmt.Fprintln(out, style(line, ColorStatus))
-	}
-	BlankLine(out)
-	fmt.Fprintln(out, style("Design. Generate. Iterate.", ColorMuted))
-	fmt.Fprintln(out, style("by Albert Mangiri", ColorGroupHeader))
-	BlankLine(out)
-	fmt.Fprintln(out, style("Press Enter to continue", ColorMuted))
-
-	r := bufio.NewReader(in)
-	for {
-		b, err := r.ReadByte()
-		if err != nil {
-			return nil
-		}
-		if b == '\n' || b == '\r' {
-			break
-		}
+	if version != "" {
+		titleLine = style(title, ColorPrimary) + "  " + style(version, ColorMuted)
 	}
 
-	// Keep the transition clean for the existing flow.
-	fmt.Fprint(out, "\033[2J\033[H")
-	return nil
+	underline := strings.Repeat("─", underlineWidth(title, 18))
+	tagline := style("Engineering ideas, not templates.", ColorMuted)
+	createdBy := style("Created by", ColorMuted)
+	author := style("Albert Mangiri", ColorGroupHeader)
+
+	lines := []string{
+		centerLine(titleLine, width),
+		centerLine(style(underline, ColorDivider), width),
+		centerLine(tagline, width),
+		"",
+		centerLine(createdBy, width),
+		centerLine(author, width),
+	}
+
+	revealLines(ctx, out, lines)
+	fmt.Fprintln(out, "")
+	return true, nil
 }
 
+func revealLines(ctx context.Context, out io.Writer, lines []string) {
+	if len(lines) == 0 {
+		return
+	}
+	if !motionAllowed(out) {
+		for _, line := range lines {
+			fmt.Fprintln(out, line)
+		}
+		return
+	}
+
+	const perLine = 70 * time.Millisecond
+	for i := range lines {
+		fmt.Fprintln(out, lines[i])
+
+		if i == len(lines)-1 {
+			break
+		}
+		timer := time.NewTimer(perLine)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+
+			for j := i + 1; j < len(lines); j++ {
+				fmt.Fprintln(out, lines[j])
+			}
+			return
+		case <-timer.C:
+		}
+	}
+}
+
+func centerLine(s string, width int) string {
+	s = strings.TrimRight(s, "\r\n")
+	if width <= 0 {
+		return s
+	}
+	n := utf8.RuneCountInString(stripANSI(s))
+	if n <= 0 || n >= width {
+		return s
+	}
+	pad := (width - n) / 2
+	if pad <= 0 {
+		return s
+	}
+	return strings.Repeat(" ", pad) + s
+}
+
+func stripANSI(s string) string {
+
+	out := make([]rune, 0, len(s))
+	rs := []rune(s)
+	for i := 0; i < len(rs); i++ {
+		if rs[i] != 0x1b {
+			out = append(out, rs[i])
+			continue
+		}
+
+		if i+1 < len(rs) && rs[i+1] == '[' {
+			i += 2
+			for i < len(rs) {
+
+				if (rs[i] >= 'A' && rs[i] <= 'Z') || (rs[i] >= 'a' && rs[i] <= 'z') {
+					break
+				}
+				i++
+			}
+			continue
+		}
+	}
+	return string(out)
+}
+
+func buildVersion() string {
+
+	bi, ok := debug.ReadBuildInfo()
+	if !ok || bi == nil {
+		return ""
+	}
+	v := strings.TrimSpace(bi.Main.Version)
+	if v == "" || v == "(devel)" {
+		return ""
+	}
+
+	const max = 24
+	if utf8.RuneCountInString(v) > max {
+		rs := []rune(v)
+		v = string(rs[:max-1]) + "…"
+	}
+	return v
+}

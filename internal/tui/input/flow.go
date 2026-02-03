@@ -25,7 +25,6 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 	}
 	tui.Divider(out)
 
-	// Web-specific sub-flow (must happen before Project Category, per UX requirement).
 	var techStack []string
 	var database []string
 	if strings.TrimSpace(appType) == "web" {
@@ -75,7 +74,6 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 		}
 	}
 
-	// Non-web (or unknown custom architecture) path uses generic tech/db prompts.
 	if len(techStack) == 0 {
 		techStackRaw, err := promptSelectWithCustom(in, out, reader, TechnologyStackPrompt)
 		if err != nil {
@@ -92,7 +90,6 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 		tui.Divider(out)
 	}
 
-	// Project Category comes after tech selection so AI can recommend based on chosen tech.
 	projectKind, err := promptSelectOptionalWithCustom(in, out, reader, ProjectKindPrompt)
 	if err != nil {
 		return model.ProjectInput{}, err
@@ -178,13 +175,13 @@ func buildOptions(p SelectPrompt) []tui.Option {
 }
 
 func buildOptionsOptional(p SelectPrompt) []tui.Option {
-	// Default selection should be "skip" so pressing Enter preserves current behavior.
+
 	options := []tui.Option{
 		{ID: "skip", Label: p.Default.Label},
 		{ID: "custom", Label: p.CustomLabel},
 	}
 	for _, opt := range p.Options {
-		// If prompt already included a skip entry, avoid duplicating it.
+
 		if strings.TrimSpace(opt.Value) == "" {
 			continue
 		}
