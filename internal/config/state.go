@@ -15,6 +15,15 @@ func SplashDisabledByEnv() bool {
 	return v != "0" && v != "false"
 }
 
+func SplashForcedByEnv() bool {
+	v := strings.TrimSpace(os.Getenv("QUIBIT_FORCE_SPLASH"))
+	if v == "" {
+		return false
+	}
+	v = strings.ToLower(v)
+	return v != "0" && v != "false"
+}
+
 func HasSeenSplash() bool {
 	p, ok := splashMarkerPath()
 	if !ok {

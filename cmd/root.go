@@ -46,7 +46,7 @@ var rootCmd = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		tui.SetMotionEnabled(!noAnim)
 		if !migrate {
-			if !noSplash && !config.SplashDisabledByEnv() && !config.HasSeenSplash() {
+			if !noSplash && !config.SplashDisabledByEnv() {
 				splashOnce.Do(func() {
 					mode := splashModeFromCmd(cmd)
 					shown, _ := tui.ShowSplashScreen(cmd.Context(), os.Stdin, cmd.OutOrStdout(), mode)
