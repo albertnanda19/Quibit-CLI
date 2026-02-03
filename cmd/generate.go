@@ -47,14 +47,17 @@ var generateCmd = &cobra.Command{
 
 			switch selection.ID {
 			case "new":
+				tui.Transition(ctx, out)
 				if err := runGenerateNew(ctx, os.Stdin, out); err != nil {
 					return err
 				}
 			case "continue":
+				tui.Transition(ctx, out)
 				if err := runContinueExisting(ctx, os.Stdin, out); err != nil {
 					return err
 				}
 			case "view":
+				tui.Transition(ctx, out)
 				if err := runViewSavedProjects(ctx, out); err != nil {
 					return err
 				}
@@ -80,10 +83,9 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 	diversityAttempts := 0
 generateLoop:
 	for {
-		tui.Status(out, "Generating project blueprint")
-
 		var idea ai.ProjectIdea
 		var rawJSON string
+		spin := tui.StartSpinner(ctx, out, "Generating project blueprint")
 		if pendingReason == nil {
 			lastReasonUsed = nil
 			idea, rawJSON, lastMeta, err = ai.GenerateProjectIdeaWithMeta(ctx, input)
@@ -92,6 +94,7 @@ generateLoop:
 			idea, rawJSON, lastMeta, err = ai.GenerateProjectIdeaWithPivotMeta(ctx, input, *pendingReason, pendingStrategy)
 			pendingReason = nil
 		}
+		spin.Stop()
 		if err != nil {
 			return fmt.Errorf("generate: %w", err)
 		}
@@ -113,7 +116,9 @@ generateLoop:
 			diversityAttempts = 0
 		}
 
+		simSpin := tui.StartSpinner(ctx, out, "Syncing with saved projects")
 		action, bestScore, err := evaluateSimilarity(ctx, idea, input)
+		simSpin.Stop()
 		if err != nil {
 			return err
 		}
@@ -143,7 +148,10 @@ generateLoop:
 
 		switch selection.ID {
 		case "accept":
-			if err := saveGeneratedProject(ctx, input, idea, rawJSON, lastMeta, lastReasonUsed); err != nil {
+			saveSpin := tui.StartSpinner(ctx, out, "Saving project")
+			err := saveGeneratedProject(ctx, input, idea, rawJSON, lastMeta, lastReasonUsed)
+			saveSpin.Stop()
+			if err != nil {
 				if errors.Is(err, errDuplicateDNA) {
 					tui.Status(out, "Duplicate result detected; regenerating")
 					pendingReason = ptrRetry(ai.RetryDuplicateDNA)
@@ -562,7 +570,9 @@ func isUniqueViolation(err error) bool {
 }
 
 func runContinueExisting(ctx context.Context, _ *os.File, out io.Writer) error {
+	loadSpin := tui.StartSpinner(ctx, out, "Loading saved projects")
 	projects, err := loadRecentProjects(ctx)
+	loadSpin.Stop()
 	if err != nil {
 		return err
 	}
@@ -665,9 +675,9 @@ func runProjectEvolution(ctx context.Context, out io.Writer, selected *pmodels.P
 	}
 
 	for {
-		tui.Status(out, "Generating next evolution")
-
+		spin := tui.StartSpinner(ctx, out, "Generating next evolution")
 		evo, rawJSON, meta, err := ai.GenerateProjectEvolutionWithMeta(ctx, input)
+		spin.Stop()
 		if err != nil {
 			return fmt.Errorf("continue: %w", err)
 		}
@@ -685,9 +695,13 @@ func runProjectEvolution(ctx context.Context, out io.Writer, selected *pmodels.P
 
 		switch selection.ID {
 		case "accept":
-			if err := saveProjectEvolution(ctx, selected.ID, rawJSON, meta); err != nil {
+			saveSpin := tui.StartSpinner(ctx, out, "Saving evolution")
+			err := saveProjectEvolution(ctx, selected.ID, rawJSON, meta)
+			saveSpin.Stop()
+			if err != nil {
 				return err
 			}
+			tui.Done(out, "Saved")
 			return nil
 		case "regenerate":
 			continue
@@ -737,7 +751,9 @@ func saveProjectEvolution(ctx context.Context, projectID uuid.UUID, rawJSON stri
 }
 
 func runViewSavedProjects(ctx context.Context, out io.Writer) error {
+	loadSpin := tui.StartSpinner(ctx, out, "Loading saved projects")
 	projects, err := loadRecentProjects(ctx)
+	loadSpin.Stop()
 	if err != nil {
 		return err
 	}
@@ -772,7 +788,9 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 
 	printIdea(out, idea)
 
+	evoSpin := tui.StartSpinner(ctx, out, "Loading evolutions")
 	evolutions, err := loadProjectEvolutions(ctx, selected.ID)
+	evoSpin.Stop()
 	if err != nil {
 		return err
 	}

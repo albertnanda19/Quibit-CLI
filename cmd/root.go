@@ -13,6 +13,7 @@ import (
 )
 
 var migrate bool
+var noAnim bool
 var splashOnce sync.Once
 
 var rootCmd = &cobra.Command{
@@ -21,6 +22,8 @@ var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Global UI motion toggle (spinner/micro-delays). No business logic impact.
+		tui.SetMotionEnabled(!noAnim)
 		if !migrate {
 			splashOnce.Do(func() {
 				_ = tui.ShowSplashScreen(os.Stdin, cmd.OutOrStdout())
@@ -29,7 +32,9 @@ var rootCmd = &cobra.Command{
 		if migrate {
 			{
 				ctx := cmd.Context()
-				tui.Status(cmd.OutOrStdout(), "Running database migrations")
+				out := cmd.OutOrStdout()
+				spin := tui.StartSpinner(ctx, out, "Running database migrations")
+				defer spin.Stop()
 				gdb, err := db.Connect(ctx)
 				if err != nil {
 					return fmt.Errorf("migrate: %w", err)
@@ -46,7 +51,8 @@ var rootCmd = &cobra.Command{
 				if err := sqlDB.Close(); err != nil {
 					return fmt.Errorf("migrate: close sql db: %w", err)
 				}
-				tui.Done(cmd.OutOrStdout(), "Database migrations completed")
+				spin.Stop()
+				tui.Done(out, "Database migrations completed")
 			}
 
 			os.Exit(0)
@@ -69,5 +75,6 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&migrate, "migrate", false, "Run database migrations")
+	rootCmd.PersistentFlags().BoolVar(&noAnim, "no-anim", false, "Disable subtle CLI animations")
 	rootCmd.AddCommand(generateCmd)
 }
