@@ -84,7 +84,36 @@ func GenerateProjectIdeaWithMeta(ctx context.Context, in model.ProjectInput) (Pr
 	if err != nil {
 		return ProjectIdea{}, "", AIResult{}, err
 	}
-	return generateProjectIdeaWithPrompt(ctx, m, BuildProjectIdeaPrompt(in), in)
+
+	// Quality gate: regenerate internally until the idea is non-cliché and has real depth.
+	const maxQualityAttempts = 4
+	var lastErr error
+	var lastMeta AIResult
+	for attempt := 0; attempt < maxQualityAttempts; attempt++ {
+		prompt := BuildProjectIdeaPrompt(in)
+		if attempt > 0 {
+			prompt = BuildProjectIdeaPivotPrompt(in, RetryQualityTooGeneric, rotatePivotStrategy(attempt))
+		}
+
+		idea, raw, meta, err := generateProjectIdeaWithPrompt(ctx, m, prompt, in)
+		lastMeta = meta
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		v := evaluateIdeaQuality(idea)
+		if v.ok() {
+			return idea, raw, meta, nil
+		}
+
+		lastErr = fmt.Errorf("generate project idea: quality gate failed: %s", v.summary())
+	}
+
+	if lastErr == nil {
+		lastErr = fmt.Errorf("generate project idea: quality gate failed")
+	}
+	return ProjectIdea{}, "", lastMeta, lastErr
 }
 
 func GenerateProjectIdeaWithPivot(ctx context.Context, in model.ProjectInput, reason RetryReason, strategy PivotStrategy) (ProjectIdea, string, error) {
@@ -97,12 +126,51 @@ func GenerateProjectIdeaWithPivotMeta(ctx context.Context, in model.ProjectInput
 	if err != nil {
 		return ProjectIdea{}, "", AIResult{}, err
 	}
-	return generateProjectIdeaWithPrompt(ctx, m, BuildProjectIdeaPivotPrompt(in, reason, strategy), in)
+
+	// Respect caller pivot on first attempt; if still generic, keep pivoting internally.
+	const maxQualityAttempts = 4
+	var lastErr error
+	var lastMeta AIResult
+	for attempt := 0; attempt < maxQualityAttempts; attempt++ {
+		prompt := BuildProjectIdeaPivotPrompt(in, reason, strategy)
+		if attempt > 0 {
+			prompt = BuildProjectIdeaPivotPrompt(in, RetryQualityTooGeneric, rotatePivotStrategy(attempt))
+		}
+
+		idea, raw, meta, err := generateProjectIdeaWithPrompt(ctx, m, prompt, in)
+		lastMeta = meta
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		v := evaluateIdeaQuality(idea)
+		if v.ok() {
+			return idea, raw, meta, nil
+		}
+		lastErr = fmt.Errorf("generate project idea: quality gate failed: %s", v.summary())
+	}
+
+	if lastErr == nil {
+		lastErr = fmt.Errorf("generate project idea: quality gate failed")
+	}
+	return ProjectIdea{}, "", lastMeta, lastErr
 }
 
 func GenerateProjectEvolution(ctx context.Context, in EvolutionInput) (ProjectEvolution, string, error) {
 	evo, raw, _, err := GenerateProjectEvolutionWithMeta(ctx, in)
 	return evo, raw, err
+}
+
+func rotatePivotStrategy(attempt int) PivotStrategy {
+	switch attempt % 3 {
+	case 1:
+		return PivotChangeTargetUser
+	case 2:
+		return PivotContextShift
+	default:
+		return PivotFeatureReplacement
+	}
 }
 
 func GenerateProjectEvolutionWithMeta(ctx context.Context, in EvolutionInput) (ProjectEvolution, string, AIResult, error) {

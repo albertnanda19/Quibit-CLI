@@ -93,6 +93,7 @@ const (
 	RetrySimilarityTooHigh RetryReason = "SIMILARITY_TOO_HIGH"
 	RetryUserRejected      RetryReason = "USER_REJECTED"
 	RetryDuplicateDNA      RetryReason = "DUPLICATE_DNA"
+	RetryQualityTooGeneric RetryReason = "QUALITY_TOO_GENERIC"
 )
 
 type PivotStrategy string
@@ -137,6 +138,9 @@ func BuildProjectIdeaPrompt(in model.ProjectInput) string {
 		"- Provide concrete, professional, portfolio-ready content (no marketing fluff).\n" +
 		"- MVP must be truly minimal and focused.\n" +
 		"- Provide explicit product and technical reasoning.\n" +
+		"- Quality bar: the project MUST satisfy at least 3 of these: not generic CRUD, not a clone, real technical depth, explainable engineering trade-offs, interview-ready, scalable/pivotable, non-trivial constraints (performance/privacy/reliability/DX).\n" +
+		"- Anti-cliche: do NOT propose generic Todo apps, generic Chat apps, basic e-commerce, blog platforms, standard habit trackers, weather apps, or basic URL shorteners. Only allowed if there is a clear extreme technical constraint/twist.\n" +
+		"- Depth enforcement: include at least one realistic non-trivial constraint and at least one explicit engineering trade-off (e.g., latency vs cost, consistency vs availability, privacy vs analytics, DX vs strictness) in existing fields.\n" +
 		"- Fill EVERY field in the schema.\n" +
 		"- Do NOT add, remove, or rename any fields.\n\n" +
 		"Schema (must include ALL fields):\n" +
