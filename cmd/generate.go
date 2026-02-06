@@ -35,6 +35,7 @@ var generateCmd = &cobra.Command{
 			tui.Context(out, "Select a mode.")
 			options := []tui.Option{
 				{ID: "new", Label: "Generate project"},
+				{ID: "idea", Label: "Generate from my own idea / problem"},
 				{ID: "continue", Label: "Continue project"},
 				{ID: "view", Label: "View saved projects"},
 				{ID: "exit", Label: "Quit"},
@@ -49,6 +50,11 @@ var generateCmd = &cobra.Command{
 			case "new":
 				tui.Transition(ctx, out)
 				if err := runGenerateNew(ctx, os.Stdin, out); err != nil {
+					return err
+				}
+			case "idea":
+				tui.Transition(ctx, out)
+				if err := runGenerateFromUserIdea(ctx, os.Stdin, out); err != nil {
 					return err
 				}
 			case "continue":
@@ -75,10 +81,23 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	return runGenerateWithInput(ctx, in, out, input)
+}
+
+func runGenerateFromUserIdea(ctx context.Context, in *os.File, out io.Writer) error {
+	input, err := tuiinput.CollectUserIdeaProjectInput(in, out)
+	if err != nil {
+		return err
+	}
+	return runGenerateWithInput(ctx, in, out, input)
+}
+
+func runGenerateWithInput(ctx context.Context, in *os.File, out io.Writer, input model.ProjectInput) error {
 	var pendingReason *ai.RetryReason
 	var pendingStrategy ai.PivotStrategy
 	var lastReasonUsed *ai.RetryReason
 	var lastMeta ai.AIResult
+	var err error
 generateLoop:
 	for {
 		if pendingReason == nil {
@@ -124,7 +143,7 @@ generateLoop:
 		default:
 		}
 
-		printIdea(out, idea)
+		printIdea(out, idea, input)
 
 		selection, err := tui.SelectOption(in, out, "Choose next action.", []tui.Option{
 			{ID: "accept", Label: "Accept and save"},
@@ -163,7 +182,7 @@ generateLoop:
 				switch after.ID {
 				case "copy":
 					var buf bytes.Buffer
-					printIdea(&buf, idea)
+					printIdea(&buf, idea, input)
 					fmt.Fprintln(&buf, "")
 					fmt.Fprintln(&buf, "----")
 					fmt.Fprintln(&buf, "Raw JSON")
@@ -816,7 +835,7 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 		return fmt.Errorf("view: parse saved raw_ai_output: %w", err)
 	}
 
-	printIdea(out, idea)
+	printIdea(out, idea, model.ProjectInput{})
 
 	evoSpin := tui.StartSpinner(ctx, out, "Loading evolutions")
 	evolutions, err := loadProjectEvolutions(ctx, selected.ID)
@@ -844,7 +863,7 @@ func runViewSavedProjects(ctx context.Context, out io.Writer) error {
 		switch after.ID {
 		case "copy":
 			var buf bytes.Buffer
-			printIdea(&buf, idea)
+			printIdea(&buf, idea, model.ProjectInput{})
 			if len(evolutions) > 0 {
 				fmt.Fprintln(&buf, "")
 				fmt.Fprintln(&buf, "Saved Evolutions")
@@ -978,7 +997,11 @@ func loadProjectEvolutions(ctx context.Context, projectID uuid.UUID) ([]pmodels.
 	return rows, nil
 }
 
-func printIdea(out io.Writer, idea ai.ProjectIdea) {
+func printIdea(out io.Writer, idea ai.ProjectIdea, input model.ProjectInput) {
+	if strings.TrimSpace(input.UserIdea) != "" {
+		printUserIdeaBlueprint(out, idea)
+		return
+	}
 	tui.Heading(out, "Project")
 	fmt.Fprintf(out, "%s — %s\n", idea.Project.Name, idea.Project.Tagline)
 
@@ -1066,6 +1089,62 @@ func printIdea(out io.Writer, idea ai.ProjectIdea) {
 
 	tui.Heading(out, "Learning Outcomes")
 	for _, item := range idea.Project.Learning {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+}
+
+func printUserIdeaBlueprint(out io.Writer, idea ai.ProjectIdea) {
+	tui.Heading(out, "Problem Statement")
+	fmt.Fprintln(out, idea.Project.Problem.Problem)
+
+	tui.Heading(out, "Project Overview")
+	fmt.Fprintf(out, "%s — %s\n", idea.Project.Name, idea.Project.Tagline)
+	if strings.TrimSpace(idea.Project.Description.Summary) != "" {
+		fmt.Fprintln(out, idea.Project.Description.Summary)
+	}
+
+	tui.Heading(out, "Assumptions & Constraints")
+	if strings.TrimSpace(idea.Project.Duration.Assumptions) != "" {
+		fmt.Fprintln(out, idea.Project.Duration.Assumptions)
+	} else {
+		fmt.Fprintln(out, "-")
+	}
+
+	tui.Heading(out, "Tech Stack Breakdown")
+	fmt.Fprintf(out, "- Backend: %s\n", idea.Project.TechStack.Backend)
+	fmt.Fprintf(out, "- Frontend: %s\n", idea.Project.TechStack.Frontend)
+	fmt.Fprintf(out, "- Database: %s\n", idea.Project.TechStack.Database)
+	fmt.Fprintf(out, "- Infra: %s\n", idea.Project.TechStack.Infra)
+	if strings.TrimSpace(idea.Project.TechStack.Justification) != "" {
+		fmt.Fprintln(out, "")
+		fmt.Fprintln(out, idea.Project.TechStack.Justification)
+	}
+
+	tui.Heading(out, "Core Features")
+	for _, item := range idea.Project.MVP.MustHave {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+
+	tui.Heading(out, "MVP Scope")
+	fmt.Fprintln(out, "Included")
+	for _, item := range idea.Project.MVP.MustHave {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+	if len(idea.Project.MVP.OutOfScope) > 0 {
+		fmt.Fprintln(out, "")
+		fmt.Fprintln(out, "Explicitly Excluded")
+		for _, item := range idea.Project.MVP.OutOfScope {
+			fmt.Fprintf(out, "- %s\n", item)
+		}
+	}
+
+	tui.Heading(out, "Engineering Focus Areas")
+	for _, item := range idea.Project.Learning {
+		fmt.Fprintf(out, "- %s\n", item)
+	}
+
+	tui.Heading(out, "Future Extensions")
+	for _, item := range idea.Project.Future {
 		fmt.Fprintf(out, "- %s\n", item)
 	}
 }

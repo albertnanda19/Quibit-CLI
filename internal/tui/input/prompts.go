@@ -138,6 +138,19 @@ var WebBackendFrameworkPrompt = SelectPrompt{
 	Default:     Option{Label: "Go (Gin)", Value: "go-gin"},
 }
 
+func WebSplitStackSelectionModePrompt(part string) SelectPrompt {
+	return SelectPrompt{
+		Title:       part + " Selection",
+		Description: "Choose whether to pick a language first or pick a framework directly.",
+		Options: []Option{
+			{Label: "Choose language first", Value: "language"},
+			{Label: "Choose framework directly", Value: "framework"},
+		},
+		CustomLabel: "Custom…",
+		Default:     Option{Label: "Choose framework directly", Value: "framework"},
+	}
+}
+
 var ProjectKindPrompt = SelectPrompt{
 	Title:       "Project Category (Optional)",
 	Description: "Optionally bias the generator toward a specific domain.",

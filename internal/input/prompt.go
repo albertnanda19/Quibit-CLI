@@ -235,6 +235,7 @@ func CollectProjectInput() (model.ProjectInput, error) {
 	}
 
 	return model.ProjectInput{
+		UserIdea:    "",
 		AppType:     appType,
 		ProjectKind: projectKind,
 		Complexity:  complexity,

@@ -110,13 +110,53 @@ func BuildProjectIdeaPrompt(in model.ProjectInput) string {
 	if err != nil {
 		techStackJSON = []byte("[]")
 	}
+	userIdea := strings.TrimSpace(in.UserIdea)
+	userIdeaJSON, err := json.Marshal(userIdea)
+	if err != nil {
+		userIdeaJSON = []byte("\"\"")
+	}
+	userIdeaLine := ""
+	userIdeaRule := ""
+	if userIdea != "" {
+		userIdeaLine = "- user_idea: " + string(userIdeaJSON) + "\n"
+		userIdeaRule = "- You MUST incorporate user_idea as the core context: align the problem statement, target users, MVP scope, and trade-offs to it. Do not ignore it.\n" +
+			"- Do NOT ask the user for additional inputs.\n" +
+			"- Be conservative: keep MVP minimal and focused on the main problem in user_idea.\n" +
+			"- Clarify MVP vs extensions:\n" +
+			"  - mvp.must_have_features = Core Features / MVP Included (only essentials).\n" +
+			"  - mvp.out_of_scope = MVP Explicitly Excluded (be clear and specific).\n" +
+			"  - future_extensions = optional Future Extensions AFTER MVP is stable; 3-6 items max; each item must be incremental, still aligned to user_idea, and must NOT change the fundamentals of the MVP.\n" +
+			"- Engineering Focus Areas: use learning_outcomes as engineering focus areas / technical concerns (e.g., idempotency, caching, auth model, observability, data modeling). Do NOT assume the user's learning goal.\n"
+	}
+
+	complexity := strings.TrimSpace(in.Complexity)
+	complexityLine := ""
+	complexityRule := ""
+	if complexity != "" && userIdea == "" {
+		complexityLine = "- complexity: " + complexity + "\n"
+		complexityRule = "- complexity must match input exactly (beginner|intermediate|advanced).\n"
+	}
+
+	goal := strings.TrimSpace(in.Goal)
+	goalLine := ""
+	if goal != "" && userIdea == "" {
+		goalLine = "- goal: " + goal + "\n"
+	}
+
+	timeframe := strings.TrimSpace(in.Timeframe)
+	timeframeLine := ""
+	timeframeRule := ""
+	if timeframe != "" && userIdea == "" {
+		timeframeLine = "- estimated_duration: " + timeframe + "\n"
+		timeframeRule = "- estimated_duration.range must match input exactly.\n"
+	}
 	projectKind := strings.TrimSpace(in.ProjectKind)
 	projectKindLine := ""
 	if projectKind != "" {
 		projectKindLine = "- project_kind: " + projectKind + "\n"
 	}
 	projectKindRule := ""
-	if projectKind == "" {
+	if projectKind == "" && userIdea == "" {
 		projectKindRule = "- If project_kind is not provided, you MUST infer a suitable software category based on tech_stack and typical real-world use.\n"
 	}
 	dbLine := databasePreferenceLine(in.Database)
@@ -125,16 +165,20 @@ func BuildProjectIdeaPrompt(in model.ProjectInput) string {
 		"You MUST return exactly one JSON object and nothing else.\n\n" +
 		"User Input (use these as constraints):\n" +
 		"- app_type: " + in.AppType + "\n" +
+		userIdeaLine +
 		projectKindLine +
 		dbLine +
-		"- complexity: " + in.Complexity + "\n" +
+		complexityLine +
 		"- tech_stack: " + string(techStackJSON) + "\n" +
-		"- goal: " + in.Goal + "\n" +
-		"- estimated_duration: " + in.Timeframe + "\n\n" +
+		goalLine +
+		timeframeLine +
+		"\n" +
 		"Rules:\n" +
+		userIdeaRule +
 		projectKindRule +
-		"- complexity must match input exactly (beginner|intermediate|advanced).\n" +
-		"- estimated_duration.range must match input exactly.\n" +
+		complexityRule +
+		timeframeRule +
+		"- Do NOT ask the user for additional inputs.\n" +
 		"- recommended_tech_stack must respect tech_stack constraints (no unrelated additions).\n" +
 		"- Provide concrete, professional, portfolio-ready content (no marketing fluff).\n" +
 		"- MVP must be truly minimal and focused.\n" +

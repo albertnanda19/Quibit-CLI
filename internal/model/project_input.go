@@ -1,6 +1,7 @@
 package model
 
 type ProjectInput struct {
+	UserIdea    string
 	AppType     string
 	ProjectKind string
 	Complexity  string

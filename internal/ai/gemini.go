@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -271,7 +272,9 @@ func decodeProjectIdea(raw string, in model.ProjectInput) (ProjectIdea, error) {
 		return ProjectIdea{}, fmt.Errorf("generate project idea: invalid JSON: trailing content")
 	}
 
-	dec2 := json.NewDecoder(strings.NewReader(string(payload)))
+	payload = sanitizeProjectIdeaPayload(payload)
+
+	dec2 := json.NewDecoder(bytes.NewReader(payload))
 	dec2.DisallowUnknownFields()
 
 	var idea ProjectIdea
@@ -284,6 +287,29 @@ func decodeProjectIdea(raw string, in model.ProjectInput) (ProjectIdea, error) {
 	}
 
 	return idea, nil
+}
+
+func sanitizeProjectIdeaPayload(payload []byte) []byte {
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &top); err != nil {
+		return payload
+	}
+
+	delete(top, "anti_cliche_constraint")
+	delete(top, "anti_cliche_constraints")
+	delete(top, "anti_cliche")
+	delete(top, "anti_generic")
+	delete(top, "anti_cliche_checks")
+
+	delete(top, "anti_duplicate_heuristics")
+	delete(top, "anti_duplicate_heuristic")
+	delete(top, "anti_duplicate")
+
+	out, err := json.Marshal(top)
+	if err != nil {
+		return payload
+	}
+	return out
 }
 
 func generateProjectIdeaWithPrompt(ctx context.Context, m *ProviderManager, prompt string, in model.ProjectInput) (ProjectIdea, string, AIResult, error) {
@@ -370,11 +396,13 @@ func validateProjectIdea(idea ProjectIdea, in model.ProjectInput) error {
 	if isTooShort(p.TechStack.Justification, 60) {
 		return fmt.Errorf("generate project idea: invalid JSON: recommended_tech_stack.justification is too short")
 	}
-	if normalizeWhitespace(p.Complexity) != in.Complexity {
-		return fmt.Errorf("generate project idea: invalid JSON: complexity must match input")
-	}
-	if normalizeWhitespace(p.Duration.Range) != in.Timeframe {
-		return fmt.Errorf("generate project idea: invalid JSON: estimated_duration.range must match input")
+	if strings.TrimSpace(in.UserIdea) == "" {
+		if normalizeWhitespace(p.Complexity) != in.Complexity {
+			return fmt.Errorf("generate project idea: invalid JSON: complexity must match input")
+		}
+		if normalizeWhitespace(p.Duration.Range) != in.Timeframe {
+			return fmt.Errorf("generate project idea: invalid JSON: estimated_duration.range must match input")
+		}
 	}
 	if countNonEmpty(p.Future) < 2 {
 		return fmt.Errorf("generate project idea: invalid JSON: future_extensions is too short")
