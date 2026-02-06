@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"quibit/internal/model"
+	"quibit/internal/techstack"
 )
 
 func promptString(r *bufio.Reader) (string, error) {
@@ -186,11 +187,26 @@ func CollectProjectInput() (model.ProjectInput, error) {
 	}
 
 	if len(techStack) == 0 {
-		techStackRaw, err := promptSelectWithDefault(r, TechnologyStackPrompt, nil)
+		languageID, err := promptSelectWithDefault(r, ProgrammingLanguagePrompt(), nil)
 		if err != nil {
 			return model.ProjectInput{}, err
 		}
-		techStack = parseTechStack(techStackRaw)
+		fmt.Println(strings.Repeat("-", 42))
+
+		var frameworkRaw string
+		if techstack.LanguageExists(strings.TrimSpace(languageID)) {
+			frameworkRaw, err = promptSelectWithDefault(r, FrameworkPrompt(strings.TrimSpace(languageID)), nil)
+			if err != nil {
+				return model.ProjectInput{}, err
+			}
+		} else {
+			frameworkRaw, err = promptWithDefault(r, "Framework / Library (Custom / Manual)", "")
+			if err != nil {
+				return model.ProjectInput{}, err
+			}
+		}
+		frameworks := parseTechStack(frameworkRaw)
+		techStack = append([]string{strings.TrimSpace(languageID)}, frameworks...)
 		fmt.Println(strings.Repeat("-", 42))
 	}
 

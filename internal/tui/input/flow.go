@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"quibit/internal/model"
+	"quibit/internal/techstack"
 	"quibit/internal/tui"
 )
 
@@ -75,11 +76,26 @@ func CollectNewProjectInput(in *os.File, out io.Writer) (model.ProjectInput, err
 	}
 
 	if len(techStack) == 0 {
-		techStackRaw, err := promptSelectWithCustom(in, out, reader, TechnologyStackPrompt)
+		languageID, err := promptSelectWithCustom(in, out, reader, ProgrammingLanguagePrompt())
 		if err != nil {
 			return model.ProjectInput{}, err
 		}
-		techStack = parseList(techStackRaw)
+		tui.Divider(out)
+
+		var frameworkRaw string
+		if techstack.LanguageExists(strings.TrimSpace(languageID)) {
+			frameworkRaw, err = promptSelectWithCustom(in, out, reader, FrameworkPrompt(strings.TrimSpace(languageID)))
+			if err != nil {
+				return model.ProjectInput{}, err
+			}
+		} else {
+			frameworkRaw, err = promptWithDefault(reader, out, "Framework / Library (Custom / Manual)", "")
+			if err != nil {
+				return model.ProjectInput{}, err
+			}
+		}
+		frameworks := parseList(frameworkRaw)
+		techStack = append([]string{strings.TrimSpace(languageID)}, frameworks...)
 		tui.Divider(out)
 
 		dbRaw, err := promptSelectWithCustom(in, out, reader, DatabasePrompt)

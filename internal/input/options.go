@@ -1,5 +1,7 @@
 package input
 
+import "quibit/internal/techstack"
+
 type SelectOption struct {
 	Label string
 	Value string
@@ -11,6 +13,55 @@ type SelectPrompt struct {
 	Options     []SelectOption
 	CustomLabel string
 	Default     SelectOption
+}
+
+func ProgrammingLanguagePromptWithDefault(defaultLanguageID string) SelectPrompt {
+	languages := techstack.Languages()
+	options := make([]SelectOption, 0, len(languages))
+	defaultLabel := ""
+	for _, l := range languages {
+		options = append(options, SelectOption{Label: l.Label, Value: l.ID})
+		if l.ID == defaultLanguageID {
+			defaultLabel = l.Label
+		}
+	}
+	if defaultLabel == "" {
+		defaultLanguageID = "go"
+		defaultLabel = "Go"
+	}
+
+	return SelectPrompt{
+		Title:       "Programming Language",
+		Description: "Pick a language first. You can also choose Custom/Manual.",
+		Options:     options,
+		CustomLabel: "Custom / Manual Choice",
+		Default:     SelectOption{Label: defaultLabel, Value: defaultLanguageID},
+	}
+}
+
+func ProgrammingLanguagePrompt() SelectPrompt {
+	return ProgrammingLanguagePromptWithDefault("go")
+}
+
+func FrameworkPrompt(languageID string) SelectPrompt {
+	fws := techstack.FrameworksForLanguage(languageID)
+	options := make([]SelectOption, 0, len(fws))
+	for _, fw := range fws {
+		options = append(options, SelectOption{Label: fw.Label, Value: fw.ID})
+	}
+
+	defaultOpt := SelectOption{Label: "Custom / Manual Choice", Value: ""}
+	if len(options) > 0 {
+		defaultOpt = options[0]
+	}
+
+	return SelectPrompt{
+		Title:       "Framework / Library",
+		Description: "Pick a framework/library/native based on your chosen language.",
+		Options:     options,
+		CustomLabel: "Custom / Manual Choice",
+		Default:     defaultOpt,
+	}
 }
 
 var ApplicationTypePrompt = SelectPrompt{
@@ -114,26 +165,6 @@ var ComplexityPrompt = SelectPrompt{
 	},
 	CustomLabel: "Custom",
 	Default:     SelectOption{Label: "Intermediate", Value: "intermediate"},
-}
-
-var TechnologyStackPrompt = SelectPrompt{
-	Title:       "Technology Stack",
-	Description: "Select or customize the primary technologies.",
-	Options: []SelectOption{
-		{Label: "Go", Value: "go"},
-		{Label: "React", Value: "react"},
-		{Label: "Vue", Value: "vue"},
-		{Label: "Astro", Value: "astro"},
-		{Label: "Laravel", Value: "laravel"},
-		{Label: "Spring Boot", Value: "spring-boot"},
-		{Label: "Node.js", Value: "nodejs"},
-		{Label: "Python", Value: "python"},
-		{Label: "Rust", Value: "rust"},
-		{Label: "Java", Value: "java"},
-		{Label: "TypeScript", Value: "typescript"},
-	},
-	CustomLabel: "Custom (comma separated)",
-	Default:     SelectOption{Label: "Go", Value: "go"},
 }
 
 var DatabasePrompt = SelectPrompt{
