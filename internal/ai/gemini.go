@@ -79,6 +79,26 @@ func GenerateProjectIdea(ctx context.Context, in model.ProjectInput) (ProjectIde
 	return idea, raw, err
 }
 
+func GenerateProjectIdeaOnceWithMeta(ctx context.Context, in model.ProjectInput) (ProjectIdea, string, AIResult, error) {
+	m, err := newDefaultProviderManager()
+	if err != nil {
+		return ProjectIdea{}, "", AIResult{}, err
+	}
+
+	prompt := BuildProjectIdeaPrompt(in)
+	res, err := m.Generate(ctx, PromptPayload{Prompt: prompt})
+	if err != nil {
+		return ProjectIdea{}, "", AIResult{}, err
+	}
+
+	raw := normalizePromptContractJSON(res.Text)
+	idea, err := decodeProjectIdea(raw, in)
+	if err != nil {
+		return ProjectIdea{}, "", res, err
+	}
+	return idea, raw, res, nil
+}
+
 func GenerateProjectIdeaWithMeta(ctx context.Context, in model.ProjectInput) (ProjectIdea, string, AIResult, error) {
 	m, err := newDefaultProviderManager()
 	if err != nil {
@@ -131,6 +151,26 @@ func GenerateProjectIdeaWithMeta(ctx context.Context, in model.ProjectInput) (Pr
 func GenerateProjectIdeaWithPivot(ctx context.Context, in model.ProjectInput, reason RetryReason, strategy PivotStrategy) (ProjectIdea, string, error) {
 	idea, raw, _, err := GenerateProjectIdeaWithPivotMeta(ctx, in, reason, strategy)
 	return idea, raw, err
+}
+
+func GenerateProjectIdeaWithPivotOnceMeta(ctx context.Context, in model.ProjectInput, reason RetryReason, strategy PivotStrategy) (ProjectIdea, string, AIResult, error) {
+	m, err := newDefaultProviderManager()
+	if err != nil {
+		return ProjectIdea{}, "", AIResult{}, err
+	}
+
+	prompt := BuildProjectIdeaPivotPrompt(in, reason, strategy)
+	res, err := m.Generate(ctx, PromptPayload{Prompt: prompt})
+	if err != nil {
+		return ProjectIdea{}, "", AIResult{}, err
+	}
+
+	raw := normalizePromptContractJSON(res.Text)
+	idea, err := decodeProjectIdea(raw, in)
+	if err != nil {
+		return ProjectIdea{}, "", res, err
+	}
+	return idea, raw, res, nil
 }
 
 func GenerateProjectIdeaWithPivotMeta(ctx context.Context, in model.ProjectInput, reason RetryReason, strategy PivotStrategy) (ProjectIdea, string, AIResult, error) {

@@ -79,38 +79,34 @@ func runGenerateNew(ctx context.Context, in *os.File, out io.Writer) error {
 	var pendingStrategy ai.PivotStrategy
 	var lastReasonUsed *ai.RetryReason
 	var lastMeta ai.AIResult
-	var diversityRef *project.Snapshot
-	diversityAttempts := 0
 generateLoop:
 	for {
+		if pendingReason == nil {
+			preDecision, preScore, preErr := evaluateSimilarityPre(ctx, input)
+			if preErr != nil {
+				return preErr
+			}
+			if preDecision != project.SimilarityOK {
+				tui.Status(out, fmt.Sprintf("Precheck similarity %.2f detected; applying deterministic pivot", preScore))
+				pendingReason = ptrRetry(ai.RetrySimilarityTooHigh)
+				pendingStrategy = selectPivotStrategy(ai.RetrySimilarityTooHigh)
+			}
+		}
+
 		var idea ai.ProjectIdea
 		var rawJSON string
 		spin := tui.StartSpinner(ctx, out, "Generating project blueprint")
 		if pendingReason == nil {
 			lastReasonUsed = nil
-			idea, rawJSON, lastMeta, err = ai.GenerateProjectIdeaWithMeta(ctx, input)
+			idea, rawJSON, lastMeta, err = ai.GenerateProjectIdeaOnceWithMeta(ctx, input)
 		} else {
 			lastReasonUsed = pendingReason
-			idea, rawJSON, lastMeta, err = ai.GenerateProjectIdeaWithPivotMeta(ctx, input, *pendingReason, pendingStrategy)
+			idea, rawJSON, lastMeta, err = ai.GenerateProjectIdeaWithPivotOnceMeta(ctx, input, *pendingReason, pendingStrategy)
 			pendingReason = nil
 		}
 		spin.Stop()
 		if err != nil {
 			return fmt.Errorf("generate: %w", err)
-		}
-
-		if diversityRef != nil {
-			current := makeSnapshotFromIdea(idea, input)
-			score := project.JaccardSimilarity(current, *diversityRef)
-			decision := project.DecideSimilarity(score)
-			if decision != project.SimilarityOK && diversityAttempts < 3 {
-				diversityAttempts++
-				pendingReason = ptrRetry(ai.RetrySimilarityTooHigh)
-				pendingStrategy = rotatePivotStrategy(diversityAttempts)
-				continue
-			}
-			diversityRef = nil
-			diversityAttempts = 0
 		}
 
 		simSpin := tui.StartSpinner(ctx, out, "Syncing with saved projects")
@@ -121,10 +117,7 @@ generateLoop:
 		}
 		switch action {
 		case project.SimilarityRegenerate:
-			tui.Status(out, fmt.Sprintf("Similarity %.2f is high; regenerating", bestScore))
-			pendingReason = ptrRetry(ai.RetrySimilarityTooHigh)
-			pendingStrategy = selectPivotStrategy(ai.RetrySimilarityTooHigh)
-			continue
+			tui.Status(out, fmt.Sprintf("Similarity %.2f is high; you may choose to regenerate", bestScore))
 		case project.SimilarityBlock:
 			tui.PrintError(out, "Generation blocked", fmt.Errorf("similarity %.2f is too high", bestScore))
 			return nil
@@ -181,22 +174,16 @@ generateLoop:
 					}
 					tui.Done(out, "Copied")
 				case "same":
-					diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
-					diversityAttempts = 0
 					pendingReason = nil
 					lastReasonUsed = nil
 					continue generateLoop
 				case "same_harder":
 					input.Complexity = bumpComplexity(input.Complexity)
-					diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
-					diversityAttempts = 0
 					pendingReason = nil
 					lastReasonUsed = nil
 					continue generateLoop
 				case "same_easier":
 					input.Complexity = lowerComplexity(input.Complexity)
-					diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
-					diversityAttempts = 0
 					pendingReason = nil
 					lastReasonUsed = nil
 					continue generateLoop
@@ -205,15 +192,11 @@ generateLoop:
 				}
 			}
 		case "regenerate":
-			diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
-			diversityAttempts = 0
 			pendingReason = ptrRetry(ai.RetryUserRejected)
 			pendingStrategy = selectPivotStrategy(ai.RetryUserRejected)
 			continue
 		case "regenerate_harder":
 			input.Complexity = bumpComplexity(input.Complexity)
-			diversityRef = ptrSnapshot(makeSnapshotFromIdea(idea, input))
-			diversityAttempts = 0
 			pendingReason = ptrRetry(ai.RetryUserRejected)
 			pendingStrategy = selectPivotStrategy(ai.RetryUserRejected)
 			continue
@@ -223,6 +206,63 @@ generateLoop:
 			return fmt.Errorf("generate: invalid selection")
 		}
 	}
+}
+
+func evaluateSimilarityPre(ctx context.Context, input model.ProjectInput) (project.SimilarityDecision, float64, error) {
+	gdb, err := db.Connect(ctx)
+	if err != nil {
+		return project.SimilarityOK, 0, fmt.Errorf("generate: %w", err)
+	}
+	sqlDB, err := gdb.DB()
+	if err != nil {
+		return project.SimilarityOK, 0, fmt.Errorf("generate: get sql db: %w", err)
+	}
+	defer func() {
+		_ = sqlDB.Close()
+	}()
+
+	limit := loadSimilarityLimit()
+	var rows []pmodels.Project
+	if err := gdb.Order("created_at desc").Limit(limit).Find(&rows).Error; err != nil {
+		return project.SimilarityOK, 0, fmt.Errorf("generate: load recent projects: %w", err)
+	}
+	if len(rows) == 0 {
+		return project.SimilarityOK, 0, nil
+	}
+
+	current := project.Snapshot{
+		Overview:          "",
+		MVPScope:          []string{},
+		TechStack:         input.TechStack,
+		Complexity:        input.Complexity,
+		EstimatedDuration: input.Timeframe,
+		AppType:           input.AppType,
+		Goal:              input.Goal,
+	}
+
+	best := 0.0
+	for _, row := range rows {
+		stack, err := parseStringArray(row.TechStackJSON)
+		if err != nil {
+			return project.SimilarityOK, 0, fmt.Errorf("generate: parse tech stack: %w", err)
+		}
+
+		prev := project.Snapshot{
+			Overview:          "",
+			MVPScope:          []string{},
+			TechStack:         stack,
+			Complexity:        row.Complexity,
+			EstimatedDuration: row.Duration,
+			AppType:           row.AppType,
+			Goal:              row.Goal,
+		}
+		score := project.JaccardSimilarity(current, prev)
+		if score > best {
+			best = score
+		}
+	}
+
+	return project.DecideSimilarity(best), best, nil
 }
 
 var errDuplicateDNA = errors.New("duplicate dna")
