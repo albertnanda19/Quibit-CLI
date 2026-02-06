@@ -191,11 +191,11 @@ func renderEntries(out io.Writer, entries []SelectEntry, selected int) {
 		label := sanitizeOneLine(entries[i].Label)
 		label = truncateToWidth(label, width-6) // room for selection prefix + spacing
 		if !entries[i].Selectable {
-			fmt.Fprintf(out, "\r\033[K%s%s\n", pad, style(label, ColorGroupHeader))
+			fmt.Fprintf(out, "\r\033[K%s%s\n", pad, style(label, ColorNeonPurple))
 			continue
 		}
 		if i == selected {
-			prefix := style("› ", ColorAccent)
+			prefix := style("▸ ", ColorNeonCyan)
 			fmt.Fprintf(out, "\r\033[K%s%s%s\n", pad, prefix, style(label, ColorPrimary))
 			continue
 		}
@@ -203,7 +203,7 @@ func renderEntries(out io.Writer, entries []SelectEntry, selected int) {
 	}
 
 	fmt.Fprint(out, "\r\033[K\n")
-	fmt.Fprintf(out, "\r\033[K%s%s\n", pad, style("↑/↓ navigate  ·  Enter select", ColorMuted))
+	fmt.Fprintf(out, "\r\033[K%s%s\n", pad, style("↑/↓ navigate", ColorMuted)+" "+style("·", ColorDivider)+" "+style("Enter select", ColorMuted))
 }
 
 func moveCursorUp(out io.Writer, lines int) {

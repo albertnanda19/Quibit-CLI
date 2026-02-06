@@ -13,18 +13,38 @@ const (
 )
 
 const (
-	ColorPrimary = "1;38;5;255"
-	ColorBody    = "38;5;252"
-	ColorMuted   = "38;5;245"
-	ColorDivider = "38;5;238"
-	ColorAccent  = "1;38;5;81"
+	// Base colors - clean and crisp
+	ColorPrimary = "1;38;5;255" // Bright white
+	ColorBody    = "38;5;252"   // Light gray
+	ColorMuted   = "38;5;245"   // Medium gray
+	ColorDivider = "38;5;238"   // Dark gray
 
-	ColorGroupHeader = "1;38;5;245"
-	ColorStatus      = "38;5;111"
-	ColorSuccess     = "38;5;114"
-	ColorWarning     = "38;5;214"
-	ColorErrorTitle  = "1;38;5;203"
-	ColorErrorDetail = "38;5;245"
+	// Blue-Purple theme colors - vibrant and cohesive
+	ColorNeonCyan    = "1;38;5;51"  // Bright cyan (primary accent)
+	ColorNeonBlue    = "1;38;5;39"  // Electric blue
+	ColorNeonPurple  = "1;38;5;141" // Bright purple
+	ColorNeonMagenta = "1;38;5;201" // Bright magenta (highlight)
+	ColorDeepBlue    = "1;38;5;33"  // Deep blue
+	ColorDeepPurple  = "1;38;5;93"  // Deep purple
+	
+	// Legacy colors for compatibility
+	ColorNeonGreen   = "1;38;5;46"  // Bright green (success)
+	ColorNeonYellow  = "1;38;5;226" // Bright yellow (warning)
+
+	// Semantic colors - blue-purple theme
+	ColorAccent      = "1;38;5;51"  // Neon cyan
+	ColorGroupHeader = "1;38;5;141" // Neon purple
+	ColorStatus      = "38;5;111"   // Softer blue
+	ColorSuccess     = "1;38;5;51"  // Cyan (instead of green)
+	ColorWarning     = "1;38;5;226" // Yellow
+	ColorErrorTitle  = "1;38;5;203" // Bright red
+	ColorErrorDetail = "38;5;245"   // Muted gray
+
+	// Border colors - blue-purple theme
+	ColorBorderPrimary   = "1;38;5;51"  // Neon cyan
+	ColorBorderSecondary = "38;5;81"    // Medium cyan
+	ColorBorderMuted     = "38;5;245"   // Gray
+	ColorBorderAccent    = "1;38;5;201" // Neon magenta
 )
 
 const ansiReset = "\033[0m"

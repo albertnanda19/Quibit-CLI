@@ -94,8 +94,9 @@ func StartSpinner(ctx context.Context, out io.Writer, message string) *Spinner {
 func (s *Spinner) loop(ctx context.Context) {
 	defer close(s.doneCh)
 
-	frames := []string{"·  ", "·· ", "···"}
-	ticker := time.NewTicker(240 * time.Millisecond)
+	// More dynamic spinner frames
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	ticker := time.NewTicker(80 * time.Millisecond)
 	defer ticker.Stop()
 
 	i := 0
@@ -122,7 +123,7 @@ func (s *Spinner) paint(frame string) {
 	defer s.mu.Unlock()
 
 	l := LayoutFor(s.out)
-	fmt.Fprintf(s.out, "\r\033[K%s%s", leftPad(l.HPad()), style("• "+s.message+" "+frame, ColorStatus))
+	fmt.Fprintf(s.out, "\r\033[K%s%s", leftPad(l.HPad()), style(frame, ColorNeonBlue)+" "+style(s.message+"...", ColorStatus))
 }
 
 func (s *Spinner) clear() {

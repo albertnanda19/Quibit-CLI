@@ -24,26 +24,33 @@ func ShowSplashScreen(ctx context.Context, in *os.File, out io.Writer, mode stri
 		return false, nil
 	}
 
+	// Clear screen for dramatic entrance
+	if motionAllowed(out) {
+		fmt.Fprint(out, "\033[2J\033[H") // Clear screen and move to top
+	}
+
 	version := buildVersion()
 	l := LayoutFor(out)
 
-	titleLines := splashHeroTitleLines(l.ContentWidth())
-	tagline := style(splashTagline(mode, l.ContentWidth()), ColorMuted)
-	author := style("by Albert Mangiri", ColorGroupHeader)
-	caption := style(splashCaption(mode, version), ColorDivider)
-
-	blocks := [][]string{
-		alignBlock(titleLines, l, true),
-		{""},
-		alignBlock([]string{tagline}, l, true),
-		{""},
-		alignBlock([]string{author}, l, true),
+	// Use terminal width for title (not content width) so 3D effect can render properly
+	// The box will adjust to fit the title
+	titleWidth := l.TerminalWidth - (l.HPad() * 2) - 8 // Subtract padding and border space
+	if titleWidth < 50 {
+		titleWidth = 50 // Minimum for 3D effect
 	}
-	if strings.TrimSpace(stripANSI(caption)) != "" {
-		blocks = append(blocks, alignBlock([]string{caption}, l, true))
+	if titleWidth > 100 {
+		titleWidth = 100 // Maximum to prevent too wide
 	}
+	
+	// Get colorful multi-color 3D title
+	titleLines := splashHeroTitleLinesColorful(titleWidth)
+	tagline := style(splashTagline(mode, l.ContentWidth()), ColorNeonCyan)
+	author := style("by Albert Mangiri", ColorNeonPurple)
+	caption := style(splashCaption(mode, version), ColorMuted)
 
-	revealBlocks(ctx, out, blocks)
+	// Render with border - box will size to fit the title
+	RenderSplashBox(out, titleLines, tagline, author, caption)
+	
 	fmt.Fprintln(out, "")
 	return true, nil
 }
@@ -171,6 +178,349 @@ func splashHeroTitleLines(width int) []string {
 	}
 	// Extreme narrow fallback: still readable, never clipped.
 	return []string{style("QUIBIT", ColorPrimary)}
+}
+
+// splashHeroTitleLinesColorful creates a 3D, colorful ASCII art title with blue-purple theme
+func splashHeroTitleLinesColorful(width int) []string {
+	// Define letters with big ASCII art (5 lines each)
+	bigLetters := map[string][]string{
+		"Q": {
+			" █████ ",
+			"█     █",
+			"█     █",
+			"█   █ █",
+			" ██████",
+		},
+		"U": {
+			"█     █",
+			"█     █",
+			"█     █",
+			"█     █",
+			" █████ ",
+		},
+		"I": {
+			"███████",
+			"   █   ",
+			"   █   ",
+			"   █   ",
+			"███████",
+		},
+		"B": {
+			"██████ ",
+			"█     █",
+			"██████ ",
+			"█     █",
+			"██████ ",
+		},
+		"T": {
+			"███████",
+			"   █   ",
+			"   █   ",
+			"   █   ",
+			"   █   ",
+		},
+	}
+
+	// Compact fallback (3 lines)
+	compactLetters := map[string][]string{
+		"Q": {"███▄", "█ ██", "███▄"},
+		"U": {"█  █", "█  █", "████"},
+		"I": {"████", " ██ ", "████"},
+		"B": {"███▄", "███▄", "███▄"},
+		"T": {"████", " ██ ", " ██ "},
+	}
+
+	// Blue-Purple gradient: Cyan -> Blue -> Purple -> Magenta -> Deep Purple -> Blue
+	colors := []string{
+		ColorNeonCyan,    // Q - Bright cyan
+		ColorNeonBlue,    // U - Electric blue
+		ColorNeonPurple,  // I - Bright purple
+		ColorNeonMagenta, // B - Magenta
+		ColorDeepPurple,  // I (second) - Deep purple
+		ColorNeonBlue,    // T - Electric blue
+	}
+
+	orderBig := []string{"Q", "U", "I", "B", "I", "T"}
+
+	// Try big version with 3D effect - LOWERED THRESHOLD to 50
+	if width >= 50 {
+		// Build the base letters first
+		big := make([]string, 5)
+		for row := 0; row < 5; row++ {
+			parts := make([]string, 0, len(orderBig))
+			for i, letter := range orderBig {
+				// Each letter gets its own color from the gradient
+				coloredLetter := style(bigLetters[letter][row], colors[i])
+				parts = append(parts, coloredLetter)
+			}
+			big[row] = strings.Join(parts, " ")
+		}
+		
+		// Apply 3D extrusion effect with shadow
+		// Use smaller shadow for narrower terminals
+		shadowDx := 1
+		shadowDy := 1
+		if width >= 65 {
+			shadowDx = 2
+		}
+		
+		big3D := extrudeBlockStyledBluePurple(big, shadowDx, shadowDy)
+		
+		if blockWidth(big3D) <= width {
+			return big3D
+		}
+	}
+
+	// Compact version with 3D effect for very narrow terminals
+	if width >= 35 {
+		compact := make([]string, 3)
+		for row := 0; row < 3; row++ {
+			parts := make([]string, 0, len(orderBig))
+			for i, letter := range orderBig {
+				coloredLetter := style(compactLetters[letter][row], colors[i])
+				parts = append(parts, coloredLetter)
+			}
+			compact[row] = strings.Join(parts, " ")
+		}
+		
+		// Apply small 3D effect to compact version too
+		compact3D := extrudeBlockStyledBluePurple(compact, 1, 1)
+		
+		if blockWidth(compact3D) <= width {
+			return compact3D
+		}
+		
+		// Fallback to non-3D compact if 3D doesn't fit
+		if blockWidth(compact) <= width {
+			return compact
+		}
+	}
+
+	// Ultra-compact fallback: each letter individually colored (no 3D)
+	fallback := ""
+	letters := []string{"Q", "U", "I", "B", "I", "T"}
+	for i, letter := range letters {
+		fallback += style(letter, colors[i])
+	}
+	return []string{fallback}
+}
+
+// extrudeBlockStyledBluePurple creates a 3D effect with blue-purple themed shadows
+func extrudeBlockStyledBluePurple(lines []string, dx int, dy int) []string {
+	if len(lines) == 0 {
+		return nil
+	}
+	if dx < 0 {
+		dx = 0
+	}
+	if dy < 0 {
+		dy = 0
+	}
+
+	base := make([][]rune, 0, len(lines))
+	maxW := 0
+	for _, ln := range lines {
+		// Strip ANSI codes to get the raw content
+		stripped := stripANSI(ln)
+		rs := []rune(strings.TrimRight(stripped, "\r\n"))
+		base = append(base, rs)
+		if len(rs) > maxW {
+			maxW = len(rs)
+		}
+	}
+	h := len(base)
+	w := maxW
+
+	ch := h + dy
+	cw := w + dx
+	const (
+		cellSpace  = 0
+		cellShadow = 1
+		cellFace   = 2
+	)
+	typeMap := make([][]uint8, ch)
+	for y := 0; y < ch; y++ {
+		row := make([]uint8, cw)
+		for x := 0; x < cw; x++ {
+			row[x] = cellSpace
+		}
+		typeMap[y] = row
+	}
+
+	filled := func(y int, x int) bool {
+		if y < 0 || y >= h {
+			return false
+		}
+		if x < 0 || x >= len(base[y]) {
+			return false
+		}
+		return base[y][x] != ' '
+	}
+	
+	markShadow := func(y int, x int) {
+		cy := y + dy
+		cx := x + dx
+		if cy < 0 || cy >= ch || cx < 0 || cx >= cw {
+			return
+		}
+		if typeMap[cy][cx] == cellSpace {
+			typeMap[cy][cx] = cellShadow
+		}
+		// Thicken shadow for better 3D effect
+		if dx > 1 {
+			if cx-1 >= 0 && typeMap[cy][cx-1] == cellSpace {
+				typeMap[cy][cx-1] = cellShadow
+			}
+		}
+	}
+	
+	for y := 0; y < h; y++ {
+		for x := 0; x < len(base[y]); x++ {
+			if !filled(y, x) {
+				continue
+			}
+			// Cast shadow from edges
+			rightEdge := !filled(y, x+1)
+			bottomEdge := !filled(y+1, x)
+			if rightEdge || bottomEdge {
+				markShadow(y, x)
+			}
+		}
+	}
+	
+	for y := 0; y < h; y++ {
+		for x := 0; x < len(base[y]); x++ {
+			if base[y][x] == ' ' {
+				continue
+			}
+			if y >= 0 && y < ch && x >= 0 && x < cw {
+				typeMap[y][x] = cellFace
+			}
+		}
+	}
+
+	shadowRune := '█'
+	if noColor() {
+		shadowRune = '▓'
+	}
+
+	// Use deep blue/purple for shadows
+	shadowOn := ansi(ColorDeepPurple)
+	reset := ansiReset
+	if noColor() {
+		shadowOn = ""
+		reset = ""
+	}
+
+	// Get colored lines with preserved ANSI codes
+	coloredLines := make([]string, len(lines))
+	copy(coloredLines, lines)
+
+	out := make([]string, 0, ch)
+	for y := 0; y < ch; y++ {
+		var b strings.Builder
+		
+		// For face cells, we need to preserve the original colored content
+		if y < len(coloredLines) {
+			visibleIdx := 0
+			
+			for x := 0; x < cw; x++ {
+				mode := typeMap[y][x]
+				
+				switch mode {
+				case cellFace:
+					// Output the original colored character
+					if visibleIdx < len(base[y]) {
+						b.WriteRune('█')
+						visibleIdx++
+					} else {
+						b.WriteRune(' ')
+					}
+				case cellShadow:
+					if !noColor() {
+						b.WriteString(shadowOn)
+					}
+					b.WriteRune(shadowRune)
+					if !noColor() {
+						b.WriteString(reset)
+					}
+				default:
+					b.WriteRune(' ')
+				}
+			}
+		} else {
+			// Shadow-only rows
+			for x := 0; x < cw; x++ {
+				mode := typeMap[y][x]
+				if mode == cellShadow {
+					if !noColor() {
+						b.WriteString(shadowOn)
+					}
+					b.WriteRune(shadowRune)
+					if !noColor() {
+						b.WriteString(reset)
+					}
+				} else {
+					b.WriteRune(' ')
+				}
+			}
+		}
+		
+		ln := strings.TrimRight(b.String(), " \t")
+		out = append(out, ln)
+	}
+	
+	// Remove trailing empty lines
+	for len(out) > 0 && strings.TrimSpace(stripANSI(out[len(out)-1])) == "" {
+		out = out[:len(out)-1]
+	}
+	
+	// Now apply colors to the face characters
+	finalOut := make([]string, len(out))
+	for i, line := range out {
+		if i < len(lines) {
+			// Re-apply the gradient colors to each letter
+			finalOut[i] = applyGradientToLine(line, []string{
+				ColorNeonCyan, ColorNeonBlue, ColorNeonPurple, 
+				ColorNeonMagenta, ColorDeepPurple, ColorNeonBlue,
+			})
+		} else {
+			finalOut[i] = line
+		}
+	}
+	
+	return finalOut
+}
+
+// applyGradientToLine applies blue-purple gradient to ASCII art line
+func applyGradientToLine(line string, colors []string) string {
+	if noColor() {
+		return line
+	}
+	
+	// Simple approach: color sections of the line
+	runes := []rune(line)
+	var result strings.Builder
+	
+	sectionSize := len(runes) / len(colors)
+	if sectionSize < 1 {
+		sectionSize = 1
+	}
+	
+	colorIdx := 0
+	for i, r := range runes {
+		if i > 0 && i%sectionSize == 0 && colorIdx < len(colors)-1 {
+			colorIdx++
+		}
+		
+		if r != ' ' && r != '▓' {
+			result.WriteString(style(string(r), colors[colorIdx]))
+		} else {
+			result.WriteRune(r)
+		}
+	}
+	
+	return result.String()
 }
 
 func styleBlock(lines []string, sgr string) []string {

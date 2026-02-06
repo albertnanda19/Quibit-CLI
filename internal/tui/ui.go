@@ -9,8 +9,19 @@ import (
 func AppHeader(out io.Writer) {
 	l := LayoutFor(out)
 	writeSectionGap(out, l)
-	writeHeader(out, l, style("QUIBIT", ColorPrimary))
+	
+	// Simple colorful title without box
+	titleText := style("Q", ColorNeonCyan) + 
+	             style("U", ColorNeonBlue) +
+	             style("I", ColorNeonPurple) +
+	             style("B", ColorNeonMagenta) +
+	             style("I", ColorDeepPurple) +
+	             style("T", ColorNeonBlue)
+	
+	writeHeader(out, l, titleText)
 	writeHeader(out, l, style("Intelligent project generator for engineers.", ColorMuted))
+	
+	// Divider with neon color
 	HeaderDivider(out)
 }
 
@@ -21,8 +32,8 @@ func BlankLine(out io.Writer) {
 func Divider(out io.Writer) {
 	l := LayoutFor(out)
 	w := l.ContentWidth()
-	line := strings.Repeat("─", w)
-	fmt.Fprintln(out, leftPad(l.HPad())+style(line, ColorDivider))
+	line := strings.Repeat("━", w) // Heavy horizontal line
+	fmt.Fprintln(out, leftPad(l.HPad())+style(line, ColorNeonCyan))
 }
 
 func HeaderDivider(out io.Writer) {
@@ -43,7 +54,8 @@ func Heading(out io.Writer, title string) {
 	if title == "" {
 		return
 	}
-	writeLine(out, l, style(title, ColorPrimary))
+	// Add visual indicator
+	writeLine(out, l, style("▸ ", ColorNeonCyan)+style(title, ColorNeonCyan))
 }
 
 func Context(out io.Writer, text string) {
@@ -86,7 +98,7 @@ func Status(out io.Writer, text string) {
 	writeSectionGap(out, l)
 	text = strings.TrimSuffix(text, "...")
 	text = strings.TrimSuffix(text, ".")
-	writeWrapped(out, l, "• "+text+"…", ColorStatus, false)
+	writeWrapped(out, l, style("◆", ColorNeonBlue)+" "+text+"…", ColorStatus, false)
 }
 
 func Done(out io.Writer, text string) {
@@ -95,7 +107,7 @@ func Done(out io.Writer, text string) {
 	if text == "" {
 		return
 	}
-	writeWrapped(out, l, "✓ "+text, ColorSuccess, false)
+	writeWrapped(out, l, style("✓", ColorNeonGreen)+" "+text, ColorSuccess, false)
 }
 
 func PrintError(out io.Writer, context string, err error) {
